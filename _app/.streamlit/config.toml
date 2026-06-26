@@ -1,0 +1,12 @@
+[browser]
+gatherUsageStats = false
+
+[server]
+fileWatcherType = "none"
+address = "127.0.0.1"
+port = 8501
+headless = true
+
+[client]
+showErrorDetails = true
+toolbarMode = "minimal"

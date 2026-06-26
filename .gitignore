@@ -1,0 +1,11 @@
+python_portable/
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.exe
+*.log
+PDFs/
+Données/
+.idea/
+.vscode/
