@@ -1,12 +1,21 @@
 import os
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFileDialog, QComboBox, QSpinBox, QCheckBox, QGroupBox,
-    QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-    QProgressBar, QAbstractItemView,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QFileDialog,
+    QComboBox,
+    QSpinBox,
+    QCheckBox,
+    QGroupBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QAbstractItemView,
 )
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 import database as db
@@ -32,7 +41,9 @@ class ImportTab(QWidget):
         self._lbl_bl = QLabel()
         self._lbl_dec = QLabel()
         for lbl in (self._lbl_ch, self._lbl_bl, self._lbl_dec):
-            lbl.setStyleSheet("background:#dce5f0; border-radius:4px; padding:6px 12px; color:#1a3a5c; font-weight:bold;")
+            lbl.setStyleSheet(
+                "background:#dce5f0; border-radius:4px; padding:6px 12px; color:#1a3a5c; font-weight:bold;"
+            )
             hl_m.addWidget(lbl)
         hl_m.addStretch()
         vl.addLayout(hl_m)
@@ -70,14 +81,19 @@ class ImportTab(QWidget):
 
         hl2 = QHBoxLayout()
         hl2.addWidget(QLabel("Feuille :"))
-        self._sheet_ch = QComboBox(); self._sheet_ch.setEnabled(False)
+        self._sheet_ch = QComboBox()
+        self._sheet_ch.setEnabled(False)
         self._sheet_ch.currentIndexChanged.connect(self._preview_ch_show)
         hl2.addWidget(self._sheet_ch, 2)
         hl2.addWidget(QLabel("Ligne en-têtes :"))
-        self._header_ch = QSpinBox(); self._header_ch.setRange(1, 10); self._header_ch.setValue(1)
+        self._header_ch = QSpinBox()
+        self._header_ch.setRange(1, 10)
+        self._header_ch.setValue(1)
         hl2.addWidget(self._header_ch)
         hl2.addWidget(QLabel("1ère donnée :"))
-        self._data_ch = QSpinBox(); self._data_ch.setRange(2, 20); self._data_ch.setValue(2)
+        self._data_ch = QSpinBox()
+        self._data_ch.setRange(2, 20)
+        self._data_ch.setValue(2)
         hl2.addWidget(self._data_ch)
         hl2.addStretch()
         vl.addLayout(hl2)
@@ -85,7 +101,9 @@ class ImportTab(QWidget):
         self._preview_ch = QTableWidget()
         self._preview_ch.setMaximumHeight(110)
         self._preview_ch.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._preview_ch.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self._preview_ch.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
         self._preview_ch.setVisible(False)
         vl.addWidget(self._preview_ch)
 
@@ -99,13 +117,15 @@ class ImportTab(QWidget):
         hl3.addWidget(self._btn_import_ch)
         vl.addLayout(hl3)
 
-        self._msg_ch = QLabel(""); vl.addWidget(self._msg_ch)
+        self._msg_ch = QLabel("")
+        vl.addWidget(self._msg_ch)
         self._file_ch_path = None
         return grp
 
     def _pick_ch(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Ouvrir fichier chantiers",
-                                               "", "Excel (*.xlsx *.xlsm *.xls)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Ouvrir fichier chantiers", "", "Excel (*.xlsx *.xlsm *.xls)"
+        )
         if not path:
             return
         self._file_ch_path = path
@@ -126,12 +146,18 @@ class ImportTab(QWidget):
             return
         try:
             with open(self._file_ch_path, "rb") as f:
-                rows = imp.get_sheet_preview(f, self._sheet_ch.currentText(),
-                                              max_rows=self._header_ch.value() + 3)
+                rows = imp.get_sheet_preview(
+                    f,
+                    self._sheet_ch.currentText(),
+                    max_rows=self._header_ch.value() + 3,
+                )
             if not rows:
                 return
-            headers = [str(c) if c is not None else "" for c in rows[self._header_ch.value() - 1]]
-            data_rows = rows[self._header_ch.value():]
+            headers = [
+                str(c) if c is not None else ""
+                for c in rows[self._header_ch.value() - 1]
+            ]
+            data_rows = rows[self._header_ch.value() :]
             self._fill_preview(self._preview_ch, headers, data_rows[:3])
             self._preview_ch.setVisible(True)
         except Exception as e:
@@ -144,13 +170,17 @@ class ImportTab(QWidget):
             with open(self._file_ch_path, "rb") as f:
                 conn = db.get_conn()
                 ok, skip, detected = imp.import_chantiers(
-                    f, self._sheet_ch.currentText(), conn,
+                    f,
+                    self._sheet_ch.currentText(),
+                    conn,
                     header_row=self._header_ch.value(),
                     first_data_row=self._data_ch.value(),
                     overwrite=self._overwrite_ch.isChecked(),
                 )
                 conn.close()
-            self._msg_ch.setText(f"✅ {ok} importé(s), {skip} ignoré(s) (déjà présents).")
+            self._msg_ch.setText(
+                f"✅ {ok} importé(s), {skip} ignoré(s) (déjà présents)."
+            )
             self._msg_ch.setStyleSheet("color:green;")
             self._refresh_counts()
         except Exception as e:
@@ -174,14 +204,19 @@ class ImportTab(QWidget):
 
         hl2 = QHBoxLayout()
         hl2.addWidget(QLabel("Feuille :"))
-        self._sheet_ea = QComboBox(); self._sheet_ea.setEnabled(False)
+        self._sheet_ea = QComboBox()
+        self._sheet_ea.setEnabled(False)
         self._sheet_ea.currentIndexChanged.connect(self._preview_ea_show)
         hl2.addWidget(self._sheet_ea, 2)
         hl2.addWidget(QLabel("Ligne en-têtes :"))
-        self._header_ea = QSpinBox(); self._header_ea.setRange(1, 10); self._header_ea.setValue(1)
+        self._header_ea = QSpinBox()
+        self._header_ea.setRange(1, 10)
+        self._header_ea.setValue(1)
         hl2.addWidget(self._header_ea)
         hl2.addWidget(QLabel("1ère donnée :"))
-        self._data_ea = QSpinBox(); self._data_ea.setRange(2, 20); self._data_ea.setValue(2)
+        self._data_ea = QSpinBox()
+        self._data_ea.setRange(2, 20)
+        self._data_ea.setValue(2)
         hl2.addWidget(self._data_ea)
         hl2.addStretch()
         vl.addLayout(hl2)
@@ -189,7 +224,9 @@ class ImportTab(QWidget):
         self._preview_ea = QTableWidget()
         self._preview_ea.setMaximumHeight(110)
         self._preview_ea.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._preview_ea.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self._preview_ea.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
         self._preview_ea.setVisible(False)
         vl.addWidget(self._preview_ea)
 
@@ -204,13 +241,15 @@ class ImportTab(QWidget):
         hl3.addWidget(self._btn_import_ea)
         vl.addLayout(hl3)
 
-        self._msg_ea = QLabel(""); vl.addWidget(self._msg_ea)
+        self._msg_ea = QLabel("")
+        vl.addWidget(self._msg_ea)
         self._file_ea_path = None
         return grp
 
     def _pick_ea(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Ouvrir fichier EA",
-                                               "", "Excel (*.xlsx *.xlsm *.xls)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Ouvrir fichier EA", "", "Excel (*.xlsx *.xlsm *.xls)"
+        )
         if not path:
             return
         self._file_ea_path = path
@@ -231,12 +270,18 @@ class ImportTab(QWidget):
             return
         try:
             with open(self._file_ea_path, "rb") as f:
-                rows = imp.get_sheet_preview(f, self._sheet_ea.currentText(),
-                                              max_rows=self._header_ea.value() + 3)
+                rows = imp.get_sheet_preview(
+                    f,
+                    self._sheet_ea.currentText(),
+                    max_rows=self._header_ea.value() + 3,
+                )
             if not rows:
                 return
-            headers = [str(c) if c is not None else "" for c in rows[self._header_ea.value() - 1]]
-            data_rows = rows[self._header_ea.value():]
+            headers = [
+                str(c) if c is not None else ""
+                for c in rows[self._header_ea.value() - 1]
+            ]
+            data_rows = rows[self._header_ea.value() :]
             self._fill_preview(self._preview_ea, headers, data_rows[:3])
             self._preview_ea.setVisible(True)
         except Exception as e:
@@ -249,7 +294,9 @@ class ImportTab(QWidget):
             with open(self._file_ea_path, "rb") as f:
                 conn = db.get_conn()
                 ok, det = imp.import_ea(
-                    f, self._sheet_ea.currentText(), conn,
+                    f,
+                    self._sheet_ea.currentText(),
+                    conn,
                     header_row=self._header_ea.value(),
                     first_data_row=self._data_ea.value(),
                     overwrite=self._overwrite_ea.isChecked(),
@@ -279,14 +326,19 @@ class ImportTab(QWidget):
 
         hl2 = QHBoxLayout()
         hl2.addWidget(QLabel("Feuille :"))
-        self._sheet_dec = QComboBox(); self._sheet_dec.setEnabled(False)
+        self._sheet_dec = QComboBox()
+        self._sheet_dec.setEnabled(False)
         self._sheet_dec.currentIndexChanged.connect(self._preview_dec_show)
         hl2.addWidget(self._sheet_dec, 2)
         hl2.addWidget(QLabel("Ligne en-têtes :"))
-        self._header_dec = QSpinBox(); self._header_dec.setRange(1, 10); self._header_dec.setValue(1)
+        self._header_dec = QSpinBox()
+        self._header_dec.setRange(1, 10)
+        self._header_dec.setValue(1)
         hl2.addWidget(self._header_dec)
         hl2.addWidget(QLabel("1ère donnée :"))
-        self._data_dec = QSpinBox(); self._data_dec.setRange(2, 20); self._data_dec.setValue(2)
+        self._data_dec = QSpinBox()
+        self._data_dec.setRange(2, 20)
+        self._data_dec.setValue(2)
         hl2.addWidget(self._data_dec)
         hl2.addStretch()
         vl.addLayout(hl2)
@@ -294,7 +346,9 @@ class ImportTab(QWidget):
         self._preview_dec = QTableWidget()
         self._preview_dec.setMaximumHeight(110)
         self._preview_dec.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._preview_dec.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        self._preview_dec.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
         self._preview_dec.setVisible(False)
         vl.addWidget(self._preview_dec)
 
@@ -309,13 +363,15 @@ class ImportTab(QWidget):
         hl3.addWidget(self._btn_import_dec)
         vl.addLayout(hl3)
 
-        self._msg_dec = QLabel(""); vl.addWidget(self._msg_dec)
+        self._msg_dec = QLabel("")
+        vl.addWidget(self._msg_dec)
         self._file_dec_path = None
         return grp
 
     def _pick_dec(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Ouvrir fichier décomptes",
-                                               "", "Excel (*.xlsx *.xlsm *.xls)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Ouvrir fichier décomptes", "", "Excel (*.xlsx *.xlsm *.xls)"
+        )
         if not path:
             return
         self._file_dec_path = path
@@ -336,12 +392,18 @@ class ImportTab(QWidget):
             return
         try:
             with open(self._file_dec_path, "rb") as f:
-                rows = imp.get_sheet_preview(f, self._sheet_dec.currentText(),
-                                              max_rows=self._header_dec.value() + 3)
+                rows = imp.get_sheet_preview(
+                    f,
+                    self._sheet_dec.currentText(),
+                    max_rows=self._header_dec.value() + 3,
+                )
             if not rows:
                 return
-            headers = [str(c) if c is not None else "" for c in rows[self._header_dec.value() - 1]]
-            data_rows = rows[self._header_dec.value():]
+            headers = [
+                str(c) if c is not None else ""
+                for c in rows[self._header_dec.value() - 1]
+            ]
+            data_rows = rows[self._header_dec.value() :]
             self._fill_preview(self._preview_dec, headers, data_rows[:3])
             self._preview_dec.setVisible(True)
         except Exception as e:
@@ -354,7 +416,9 @@ class ImportTab(QWidget):
             with open(self._file_dec_path, "rb") as f:
                 conn = db.get_conn()
                 ok, det = imp.import_decomptes(
-                    f, self._sheet_dec.currentText(), conn,
+                    f,
+                    self._sheet_dec.currentText(),
+                    conn,
                     header_row=self._header_dec.value(),
                     first_data_row=self._data_dec.value(),
                     overwrite=self._overwrite_dec.isChecked(),
@@ -375,4 +439,6 @@ class ImportTab(QWidget):
         table.setRowCount(len(rows))
         for r, row in enumerate(rows):
             for c, val in enumerate(row):
-                table.setItem(r, c, QTableWidgetItem(str(val) if val is not None else ""))
+                table.setItem(
+                    r, c, QTableWidgetItem(str(val) if val is not None else "")
+                )

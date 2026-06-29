@@ -1,7 +1,16 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QComboBox, QPushButton, QTableWidget, QTableWidgetItem,
-    QHeaderView, QMessageBox, QAbstractItemView,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QComboBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QMessageBox,
+    QAbstractItemView,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor
@@ -25,7 +34,8 @@ class HistoriqueTab(QWidget):
 
         # Filtres
         hl_f = QHBoxLayout()
-        self._search = QLineEdit(); self._search.setPlaceholderText("Recherche (ID, nom, client)…")
+        self._search = QLineEdit()
+        self._search.setPlaceholderText("Recherche (ID, nom, client)…")
         self._search.textChanged.connect(self._filter)
         hl_f.addWidget(self._search, 3)
 
@@ -46,11 +56,20 @@ class HistoriqueTab(QWidget):
         # Table
         self._table = QTableWidget()
         self._table.setColumnCount(7)
-        self._table.setHorizontalHeaderLabels([
-            "ID Chantier", "Nom chantier", "Gestionnaire", "Client", "Date bilan",
-            "Marge finale (%)", "Satisfaction /5",
-        ])
-        self._table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._table.setHorizontalHeaderLabels(
+            [
+                "ID Chantier",
+                "Nom chantier",
+                "Gestionnaire",
+                "Client",
+                "Date bilan",
+                "Marge finale (%)",
+                "Satisfaction /5",
+            ]
+        )
+        self._table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.setAlternatingRowColors(True)
@@ -74,7 +93,13 @@ class HistoriqueTab(QWidget):
 
     def refresh(self):
         self._bilans = db.get_all_bilans()
-        gestionnaires = sorted({b.get("gestionnaire") or "?" for b in self._bilans if b.get("gestionnaire")})
+        gestionnaires = sorted(
+            {
+                b.get("gestionnaire") or "?"
+                for b in self._bilans
+                if b.get("gestionnaire")
+            }
+        )
         current_gest = self._combo_gest.currentText()
         self._combo_gest.blockSignals(True)
         self._combo_gest.clear()
@@ -91,10 +116,13 @@ class HistoriqueTab(QWidget):
         rows = list(self._bilans)
         search = self._search.text().lower()
         if search:
-            rows = [b for b in rows if
-                    search in str(b.get("id_chantier") or "").lower() or
-                    search in (b.get("intitule") or "").lower() or
-                    search in (b.get("client") or "").lower()]
+            rows = [
+                b
+                for b in rows
+                if search in str(b.get("id_chantier") or "").lower()
+                or search in (b.get("intitule") or "").lower()
+                or search in (b.get("client") or "").lower()
+            ]
 
         gest = self._combo_gest.currentText()
         if gest and gest != "Tous les gestionnaires":
@@ -118,8 +146,16 @@ class HistoriqueTab(QWidget):
                 b.get("gestionnaire") or "—",
                 b.get("client") or "—",
                 b.get("date_bilan") or "—",
-                f"{b['marge_finale']:.1f}%" if b.get("marge_finale") is not None else "—",
-                f"{b['satisfaction_client']}/5" if b.get("satisfaction_client") is not None else "—",
+                (
+                    f"{b['marge_finale']:.1f}%"
+                    if b.get("marge_finale") is not None
+                    else "—"
+                ),
+                (
+                    f"{b['satisfaction_client']}/5"
+                    if b.get("satisfaction_client") is not None
+                    else "—"
+                ),
             ]
             for c, v in enumerate(vals):
                 item = QTableWidgetItem(v)
@@ -128,7 +164,11 @@ class HistoriqueTab(QWidget):
 
             # Couleur marge
             if b.get("marge_finale") is not None:
-                color = QColor(200, 240, 200) if b["marge_finale"] >= 0 else QColor(255, 210, 210)
+                color = (
+                    QColor(200, 240, 200)
+                    if b["marge_finale"] >= 0
+                    else QColor(255, 210, 210)
+                )
                 self._table.item(r, 5).setBackground(color)
 
         self._btn_mod.setEnabled(False)
@@ -155,7 +195,8 @@ class HistoriqueTab(QWidget):
         if not bilan_id:
             return
         reply = QMessageBox.question(
-            self, "Confirmer la suppression",
+            self,
+            "Confirmer la suppression",
             "Supprimer définitivement ce bilan ? Cette action est irréversible.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
