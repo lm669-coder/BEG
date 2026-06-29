@@ -29,20 +29,22 @@ def _num(val):
         return None
 
 
+_ACCENT_MAP = {
+    "é": "e", "è": "e", "ê": "e", "ë": "e",
+    "à": "a", "â": "a", "ä": "a",
+    "ù": "u", "û": "u", "ü": "u",
+    "î": "i", "ï": "i",
+    "ô": "o", "ö": "o",
+    "ç": "c",
+}
+
+
 def _normalize(text):
     """Lowercase + strip accents for fuzzy header matching."""
     if not text:
         return ""
-    replacements = {
-        "é": "e", "è": "e", "ê": "e", "ë": "e",
-        "à": "a", "â": "a", "ä": "a",
-        "ù": "u", "û": "u", "ü": "u",
-        "î": "i", "ï": "i",
-        "ô": "o", "ö": "o",
-        "ç": "c",
-    }
     t = str(text).lower().strip()
-    for k, v in replacements.items():
+    for k, v in _ACCENT_MAP.items():
         t = t.replace(k, v)
     return t
 
@@ -155,17 +157,18 @@ def import_chantiers(source, sheet_name, conn,
         conn.execute("DELETE FROM chantiers")
         conn.commit()
 
+    existing_ids: set = set()
+    if not overwrite:
+        existing_ids = {r[0] for r in conn.execute("SELECT id_chantier FROM chantiers").fetchall()}
+
     imported = skipped = 0
     for row in rows[first_data_row - header_row:]:
         id_c = _safe(g(row, "id"))
         if not id_c:
             continue
-        existing = conn.execute("SELECT 1 FROM chantiers WHERE id_chantier=?", (id_c,)).fetchone()
-        if existing and not overwrite:
+        if id_c in existing_ids:
             skipped += 1
             continue
-        if existing and overwrite:
-            conn.execute("DELETE FROM chantiers WHERE id_chantier=?", (id_c,))
 
         conn.execute("""
         INSERT INTO chantiers (

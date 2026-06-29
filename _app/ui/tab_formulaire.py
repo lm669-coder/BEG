@@ -15,6 +15,8 @@ import database as db
 import pdf_export
 
 BEG_BLUE = "#1a3a5c"
+_DATE_FORMATS = ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y")
+_FIXED_PP_ROLES = ("Client", "Architecte", "Bureau d'étude")
 
 
 def _section_label(text: str) -> QLabel:
@@ -31,6 +33,9 @@ def _info_label(text: str) -> QLabel:
     return lbl
 
 
+def _fmt_eur(n: float) -> str:
+    return f"{n:,.0f} €".replace(",", " ")
+
 
 class DynamicSection(QWidget):
     def __init__(self, label_add: str, parent=None):
@@ -43,6 +48,7 @@ class DynamicSection(QWidget):
         self._btn_add = QPushButton(f"+ {label_add}")
         self._btn_add.setObjectName("btn_add")
         self._layout.addWidget(self._btn_add)
+        self._btn_add.clicked.connect(self.add_row)
 
     def _insert_row_widget(self, row_widget: QWidget):
         idx = self._layout.indexOf(self._btn_add)
@@ -70,7 +76,6 @@ class DynamicSection(QWidget):
 class PPExtraSection(DynamicSection):
     def __init__(self, parent=None):
         super().__init__("Ajouter une partie prenante", parent)
-        self._btn_add.clicked.connect(lambda: self.add_row())
 
     def add_row(self, role="", nom="", relation="", evaluation=3):
         role_e = QLineEdit(role); role_e.setPlaceholderText("Rôle")
@@ -124,7 +129,6 @@ class PPExtraSection(DynamicSection):
 class PosteSection(DynamicSection):
     def __init__(self, label_add: str, parent=None):
         super().__init__(label_add, parent)
-        self._btn_add.clicked.connect(lambda: self.add_row())
 
     def add_row(self, denomination="", prs=0.0, pre=0.0):
         denom_e = QLineEdit(denomination); denom_e.setPlaceholderText("Dénomination / poste")
@@ -192,7 +196,6 @@ class PosteSection(DynamicSection):
 class TravauxSection(DynamicSection):
     def __init__(self, parent=None):
         super().__init__("Ajouter travaux internes", parent)
-        self._btn_add.clicked.connect(lambda: self.add_row())
         self._total_lbl = QLabel()
         self._layout.addWidget(self._total_lbl)
 
@@ -286,7 +289,6 @@ class STSection(DynamicSection):
 
     def __init__(self, parent=None):
         super().__init__("Ajouter un sous-traitant", parent)
-        self._btn_add.clicked.connect(lambda: self.add_row())
 
     def add_row(self, nom="", **scores):
         nom_e = QLineEdit(nom); nom_e.setPlaceholderText("Nom du sous-traitant")
@@ -480,11 +482,7 @@ class FormulaireTab(QWidget):
         self._montant_facture = db.get_montant_facture(id_c)
 
         if ch:
-            self._lbl_intitule.setText(f"Chantier : {ch.get('intitule', '—')}")
-            self._lbl_gestionnaire.setText(f"Gestionnaire : {ch.get('gestionnaire', '—')}")
-            self._lbl_client.setText(f"Client : {ch.get('client', '—')}")
-            self._lbl_secteur.setText(f"Secteur : {ch.get('secteur', '—')}")
-            self._info_chantier.setVisible(True)
+            self._show_chantier_info(ch)
             self._warn_chantier.setText("")
 
             if self._loaded_id is None:
@@ -717,7 +715,7 @@ class FormulaireTab(QWidget):
         delai_base = dc if dc > 0 else (ds if ds > 0 else None)
         if oc_raw and delai_base is not None:
             start = None
-            for fmt in ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y"]:
+            for fmt in _DATE_FORMATS:
                 try:
                     start = datetime.strptime(oc_raw.strip(), fmt).date()
                     break
@@ -745,8 +743,8 @@ class FormulaireTab(QWidget):
 
         mb = self._montant_base.value()
         md = self._montant_decomptes.value()
-        self._total_pv_lbl.setText(f"{mb + md:,.0f} €".replace(",", " "))
-        self._total_ea_lbl.setText(f"{self._montant_facture:,.0f} €".replace(",", " "))
+        self._total_pv_lbl.setText(_fmt_eur(mb + md))
+        self._total_ea_lbl.setText(_fmt_eur(self._montant_facture))
 
     # ── Section 4 : Rendements ─────────────────────────────────────────────
     def _build_section4(self):
@@ -1031,9 +1029,9 @@ class FormulaireTab(QWidget):
 
         # PP fixes
         pp_fixed = {p["role"]: p for p in bilan.get("parties_prenantes", [])
-                    if p.get("role") in ("Client", "Architecte", "Bureau d'étude")}
+                    if p.get("role") in _FIXED_PP_ROLES}
         pp_extra = [p for p in bilan.get("parties_prenantes", [])
-                    if p.get("role") not in ("Client", "Architecte", "Bureau d'étude")]
+                    if p.get("role") not in _FIXED_PP_ROLES]
 
         for role, (nom_e, rel_e, eval_s) in [
             ("Client", (self._pp_client_nom, self._pp_client_rel, self._pp_client_eval)),
@@ -1054,14 +1052,16 @@ class FormulaireTab(QWidget):
         self._chantier_info = db.get_chantier(str(bilan["id_chantier"]))
         self._montant_facture = db.get_montant_facture(str(bilan["id_chantier"]))
         if self._chantier_info:
-            ch = self._chantier_info
-            self._lbl_intitule.setText(f"Chantier : {ch.get('intitule', '—')}")
-            self._lbl_gestionnaire.setText(f"Gestionnaire : {ch.get('gestionnaire', '—')}")
-            self._lbl_client.setText(f"Client : {ch.get('client', '—')}")
-            self._lbl_secteur.setText(f"Secteur : {ch.get('secteur', '—')}")
-            self._info_chantier.setVisible(True)
+            self._show_chantier_info(self._chantier_info)
 
         self._update_calculs()
+
+    def _show_chantier_info(self, ch: dict):
+        self._lbl_intitule.setText(f"Chantier : {ch.get('intitule', '—')}")
+        self._lbl_gestionnaire.setText(f"Gestionnaire : {ch.get('gestionnaire', '—')}")
+        self._lbl_client.setText(f"Client : {ch.get('client', '—')}")
+        self._lbl_secteur.setText(f"Secteur : {ch.get('secteur', '—')}")
+        self._info_chantier.setVisible(True)
 
     def _on_combo_select(self, idx):
         if idx <= 0:
