@@ -134,8 +134,8 @@ class ImportTab(QWidget):
             data_rows = rows[self._header_ch.value():]
             self._fill_preview(self._preview_ch, headers, data_rows[:3])
             self._preview_ch.setVisible(True)
-        except Exception:
-            pass
+        except Exception as e:
+            self._msg_ch.setText(f"Aperçu impossible : {e}")
 
     def _import_ch(self):
         if not self._file_ch_path:
@@ -239,8 +239,8 @@ class ImportTab(QWidget):
             data_rows = rows[self._header_ea.value():]
             self._fill_preview(self._preview_ea, headers, data_rows[:3])
             self._preview_ea.setVisible(True)
-        except Exception:
-            pass
+        except Exception as e:
+            self._msg_ea.setText(f"Aperçu impossible : {e}")
 
     def _import_ea(self):
         if not self._file_ea_path:
@@ -344,8 +344,8 @@ class ImportTab(QWidget):
             data_rows = rows[self._header_dec.value():]
             self._fill_preview(self._preview_dec, headers, data_rows[:3])
             self._preview_dec.setVisible(True)
-        except Exception:
-            pass
+        except Exception as e:
+            self._msg_dec.setText(f"Aperçu impossible : {e}")
 
     def _import_dec(self):
         if not self._file_dec_path:

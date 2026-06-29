@@ -63,6 +63,14 @@ STYLES = {
     "hdr_right": _s("hdr_right", fontSize=7.5, textColor=C_GRAY, alignment=TA_RIGHT),
     "th":        _s("th",        fontSize=7.5, fontName="Helvetica-Bold",
                     textColor=C_GRAY, leading=10),
+    "subsec":    _s("subsec",    fontSize=10,  fontName="Helvetica-Bold",
+                    textColor=C_ACCENT, spaceAfter=5),
+    "loss_lbl":  _s("loss_lbl", fontSize=10,  fontName="Helvetica-Bold",
+                    textColor=C_RED_T, spaceAfter=5),
+    "gain_lbl":  _s("gain_lbl", fontSize=10,  fontName="Helvetica-Bold",
+                    textColor=C_GREEN_T, spaceAfter=5),
+    "int_lbl":   _s("int_lbl",  fontSize=10,  fontName="Helvetica-Bold",
+                    textColor=C_ACCENT, spaceAfter=5),
 }
 
 
@@ -260,8 +268,7 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
     unite = bilan.get("unite_delai", "JC")
     respect = ((dc or 0) + dcomp - dr) if (dc is not None and dr is not None) else None
 
-    story.append(Paragraph("Délais", _s("sh", fontSize=10, fontName="Helvetica-Bold",
-                                        textColor=C_ACCENT, spaceAfter=5)))
+    story.append(Paragraph("Délais", STYLES["subsec"]))
     story.append(_kv_table([
         ("Délai soumission",              f"{ds} {unite}" if ds else "—"),
         ("Délai contractuel",             f"{dc} {unite}" if dc else "—"),
@@ -280,8 +287,7 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
     mg_devis  = bilan.get("marge_devis")
     mg_finale = bilan.get("marge_finale")
 
-    story.append(Paragraph("Budget & Marges", _s("sh2", fontSize=10, fontName="Helvetica-Bold",
-                                                  textColor=C_ACCENT, spaceAfter=5)))
+    story.append(Paragraph("Budget & Marges", STYLES["subsec"]))
     story.append(_kv_table([
         ("Montant de base PV",             _euro(mb)),
         ("Montant des décomptes PV",        _euro(md)),
@@ -324,23 +330,17 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
             return _data_table(header, rows, cw, row_bg=bgs)
 
         if postes_perte:
-            story.append(Paragraph("Postes évalués trop bas — en perte",
-                                   _s("l1", fontSize=10, fontName="Helvetica-Bold",
-                                      textColor=C_RED_T, spaceAfter=5)))
+            story.append(Paragraph("Postes évalués trop bas — en perte", STYLES["loss_lbl"]))
             story.append(_postes_tbl(postes_perte, is_loss=True))
             story.append(Spacer(1, 0.2 * cm))
 
         if postes_surb:
-            story.append(Paragraph("Postes évalués trop haut — surbénéfice",
-                                   _s("l2", fontSize=10, fontName="Helvetica-Bold",
-                                      textColor=C_GREEN_T, spaceAfter=5)))
+            story.append(Paragraph("Postes évalués trop haut — surbénéfice", STYLES["gain_lbl"]))
             story.append(_postes_tbl(postes_surb, is_loss=False))
             story.append(Spacer(1, 0.2 * cm))
 
         if travaux:
-            story.append(Paragraph("Travaux réalisés en interne",
-                                   _s("l3", fontSize=10, fontName="Helvetica-Bold",
-                                      textColor=C_ACCENT, spaceAfter=5)))
+            story.append(Paragraph("Travaux réalisés en interne", STYLES["int_lbl"]))
             header = [Paragraph(h, STYLES["th"]) for h in
                       ["Dénomination", "H-S (budg.)", "H-E (réel)", "Coefficient"]]
             rows = []
