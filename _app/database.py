@@ -169,15 +169,15 @@ def init_db() -> None:
 
         # Migration : ajout colonnes (idempotent)
         for table, col_name, col_type in [
-            ("bilans",    "rp_demandee",       "TEXT"),
-            ("bilans",    "rp_realisee",       "TEXT"),
-            ("bilans",    "rp_statut",         "TEXT"),
-            ("bilans",    "rd_a_demander",     "TEXT"),
-            ("bilans",    "rd_realisee",       "TEXT"),
-            ("bilans",    "rd_statut",         "TEXT"),
-            ("bilans",    "prix_de_revient",   "REAL"),
-            ("chantiers", "prix_de_revient",   "REAL"),
-            ("decomptes", "statut_accepte",    "INTEGER"),
+            ("bilans", "rp_demandee", "TEXT"),
+            ("bilans", "rp_realisee", "TEXT"),
+            ("bilans", "rp_statut", "TEXT"),
+            ("bilans", "rd_a_demander", "TEXT"),
+            ("bilans", "rd_realisee", "TEXT"),
+            ("bilans", "rd_statut", "TEXT"),
+            ("bilans", "prix_de_revient", "REAL"),
+            ("chantiers", "prix_de_revient", "REAL"),
+            ("decomptes", "statut_accepte", "INTEGER"),
         ]:
             try:
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}")
@@ -192,7 +192,9 @@ def init_db() -> None:
 def get_chantier(id_chantier: str) -> dict | None:
     conn = get_conn()
     try:
-        row = conn.execute("SELECT * FROM chantiers WHERE id_chantier = ?", (str(id_chantier),)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM chantiers WHERE id_chantier = ?", (str(id_chantier),)
+        ).fetchone()
         return dict(row) if row else None
     finally:
         conn.close()
@@ -204,10 +206,12 @@ def get_decomptes_totals(id_chantier: str) -> dict:
         row = conn.execute(
             "SELECT SUM(montant) AS total_montant, SUM(delai_complementaire) AS total_delai "
             "FROM decomptes WHERE id_chantier = ? AND (statut_accepte = 1 OR statut_accepte IS NULL)",
-            (str(id_chantier),)
+            (str(id_chantier),),
         ).fetchone()
         return {
-            "montant": float(row["total_montant"]) if row and row["total_montant"] else 0.0,
+            "montant": (
+                float(row["total_montant"]) if row and row["total_montant"] else 0.0
+            ),
             "delai": int(row["total_delai"]) if row and row["total_delai"] else 0,
         }
     finally:
@@ -219,7 +223,7 @@ def get_montant_facture(id_chantier: str) -> float:
     try:
         row = conn.execute(
             "SELECT SUM(montant_facture) AS total FROM etats_avancement WHERE num_chantier = ?",
-            (str(id_chantier),)
+            (str(id_chantier),),
         ).fetchone()
         return float(row["total"]) if row and row["total"] else 0.0
     finally:
@@ -255,7 +259,9 @@ def get_all_bilans() -> list[dict]:
 def bilan_exists_for_chantier(id_chantier: str) -> int | None:
     conn = get_conn()
     try:
-        row = conn.execute("SELECT id FROM bilans WHERE id_chantier = ?", (str(id_chantier),)).fetchone()
+        row = conn.execute(
+            "SELECT id FROM bilans WHERE id_chantier = ?", (str(id_chantier),)
+        ).fetchone()
         return row["id"] if row else None
     finally:
         conn.close()
@@ -268,23 +274,38 @@ def save_bilan(data: dict) -> int:
         bilan_id = data.get("id")
 
         fields = (
-            data["id_chantier"], data.get("date_bilan"),
-            data.get("delai_soumission"), data.get("delai_contractuel"),
-            data.get("delai_complementaire"), data.get("delai_reel"), data.get("unite_delai", "JC"),
-            data.get("montant_base_pv"), data.get("montant_decomptes_pv"),
-            data.get("marge_devis"), data.get("marge_finale"),
-            data.get("niveau_qualite"), data.get("satisfaction_client"),
-            data.get("travaux_non_satisfaisants"), data.get("ameliorations_qualite"),
-            data.get("accidents_chantier", "Non"), data.get("description_accidents"),
-            data.get("ameliorations_securite"), data.get("commentaire_general"),
+            data["id_chantier"],
+            data.get("date_bilan"),
+            data.get("delai_soumission"),
+            data.get("delai_contractuel"),
+            data.get("delai_complementaire"),
+            data.get("delai_reel"),
+            data.get("unite_delai", "JC"),
+            data.get("montant_base_pv"),
+            data.get("montant_decomptes_pv"),
+            data.get("marge_devis"),
+            data.get("marge_finale"),
+            data.get("niveau_qualite"),
+            data.get("satisfaction_client"),
+            data.get("travaux_non_satisfaisants"),
+            data.get("ameliorations_qualite"),
+            data.get("accidents_chantier", "Non"),
+            data.get("description_accidents"),
+            data.get("ameliorations_securite"),
+            data.get("commentaire_general"),
             data.get("notes_sous_traitants"),
-            data.get("rp_demandee"), data.get("rp_realisee"), data.get("rp_statut"),
-            data.get("rd_a_demander"), data.get("rd_realisee"), data.get("rd_statut"),
+            data.get("rp_demandee"),
+            data.get("rp_realisee"),
+            data.get("rp_statut"),
+            data.get("rd_a_demander"),
+            data.get("rd_realisee"),
+            data.get("rd_statut"),
             data.get("prix_de_revient"),
         )
 
         if bilan_id:
-            c.execute("""
+            c.execute(
+                """
             UPDATE bilans SET
                 id_chantier=?, date_bilan=?,
                 delai_soumission=?, delai_contractuel=?, delai_complementaire=?, delai_reel=?, unite_delai=?,
@@ -297,9 +318,12 @@ def save_bilan(data: dict) -> int:
                 prix_de_revient=?,
                 updated_at=CURRENT_TIMESTAMP
             WHERE id=?
-            """, fields + (bilan_id,))
+            """,
+                fields + (bilan_id,),
+            )
         else:
-            c.execute("""
+            c.execute(
+                """
             INSERT INTO bilans (
                 id_chantier, date_bilan,
                 delai_soumission, delai_contractuel, delai_complementaire, delai_reel, unite_delai,
@@ -311,38 +335,68 @@ def save_bilan(data: dict) -> int:
                 rd_a_demander, rd_realisee, rd_statut,
                 prix_de_revient
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, fields)
+            """,
+                fields,
+            )
             bilan_id = c.lastrowid
+            assert bilan_id is not None
 
         for table in _BILAN_CHILD_TABLES:
-            c.execute(f"DELETE FROM {table} WHERE bilan_id = ?", (bilan_id,))
+            c.execute(f"DELETE FROM {table} WHERE bilan_id = ?", (bilan_id,))  # nosec B608
 
         for pp in data.get("parties_prenantes", []):
             c.execute(
                 "INSERT INTO bilan_parties_prenantes (bilan_id,role,nom,relation,evaluation) VALUES (?,?,?,?,?)",
-                (bilan_id, pp.get("role"), pp.get("nom"), pp.get("relation"), pp.get("evaluation"))
+                (
+                    bilan_id,
+                    pp.get("role"),
+                    pp.get("nom"),
+                    pp.get("relation"),
+                    pp.get("evaluation"),
+                ),
             )
 
         for i, st in enumerate(data.get("sous_traitants", [])):
-            c.execute("""
+            c.execute(
+                """
             INSERT INTO bilan_sous_traitants
                 (bilan_id,ordre,nom,respect_prix,respect_delais,respect_securite,respect_qualite,reactivite,communication)
             VALUES (?,?,?,?,?,?,?,?,?)
-            """, (bilan_id, i + 1, st.get("nom"), st.get("respect_prix"), st.get("respect_delais"),
-                  st.get("respect_securite"), st.get("respect_qualite"), st.get("reactivite"), st.get("communication")))
+            """,
+                (
+                    bilan_id,
+                    i + 1,
+                    st.get("nom"),
+                    st.get("respect_prix"),
+                    st.get("respect_delais"),
+                    st.get("respect_securite"),
+                    st.get("respect_qualite"),
+                    st.get("reactivite"),
+                    st.get("communication"),
+                ),
+            )
 
         for p in data.get("postes_perte", []):
-            c.execute("INSERT INTO bilan_postes_perte (bilan_id,denomination,prs,pre) VALUES (?,?,?,?)",
-                      (bilan_id, p.get("denomination"), p.get("prs"), p.get("pre")))
+            c.execute(
+                "INSERT INTO bilan_postes_perte (bilan_id,denomination,prs,pre) VALUES (?,?,?,?)",
+                (bilan_id, p.get("denomination"), p.get("prs"), p.get("pre")),
+            )
 
         for p in data.get("postes_surbenefice", []):
-            c.execute("INSERT INTO bilan_postes_surbenefice (bilan_id,denomination,prs,pre) VALUES (?,?,?,?)",
-                      (bilan_id, p.get("denomination"), p.get("prs"), p.get("pre")))
+            c.execute(
+                "INSERT INTO bilan_postes_surbenefice (bilan_id,denomination,prs,pre) VALUES (?,?,?,?)",
+                (bilan_id, p.get("denomination"), p.get("prs"), p.get("pre")),
+            )
 
         for t in data.get("travaux_internes", []):
             c.execute(
                 "INSERT INTO bilan_travaux_internes (bilan_id,denomination,heures_soumission,heures_execution) VALUES (?,?,?,?)",
-                (bilan_id, t.get("denomination"), t.get("heures_soumission"), t.get("heures_execution"))
+                (
+                    bilan_id,
+                    t.get("denomination"),
+                    t.get("heures_soumission"),
+                    t.get("heures_execution"),
+                ),
             )
 
         conn.commit()
@@ -358,16 +412,41 @@ def load_bilan(bilan_id: int) -> dict | None:
         if not row:
             return None
         bilan = dict(row)
-        bilan["parties_prenantes"] = [dict(r) for r in conn.execute(
-            "SELECT * FROM bilan_parties_prenantes WHERE bilan_id=? ORDER BY id", (bilan_id,)).fetchall()]
-        bilan["sous_traitants"] = [dict(r) for r in conn.execute(
-            "SELECT * FROM bilan_sous_traitants WHERE bilan_id=? ORDER BY ordre", (bilan_id,)).fetchall()]
-        bilan["postes_perte"] = [dict(r) for r in conn.execute(
-            "SELECT * FROM bilan_postes_perte WHERE bilan_id=? ORDER BY id", (bilan_id,)).fetchall()]
-        bilan["postes_surbenefice"] = [dict(r) for r in conn.execute(
-            "SELECT * FROM bilan_postes_surbenefice WHERE bilan_id=? ORDER BY id", (bilan_id,)).fetchall()]
-        bilan["travaux_internes"] = [dict(r) for r in conn.execute(
-            "SELECT * FROM bilan_travaux_internes WHERE bilan_id=? ORDER BY id", (bilan_id,)).fetchall()]
+        bilan["parties_prenantes"] = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM bilan_parties_prenantes WHERE bilan_id=? ORDER BY id",
+                (bilan_id,),
+            ).fetchall()
+        ]
+        bilan["sous_traitants"] = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM bilan_sous_traitants WHERE bilan_id=? ORDER BY ordre",
+                (bilan_id,),
+            ).fetchall()
+        ]
+        bilan["postes_perte"] = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM bilan_postes_perte WHERE bilan_id=? ORDER BY id",
+                (bilan_id,),
+            ).fetchall()
+        ]
+        bilan["postes_surbenefice"] = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM bilan_postes_surbenefice WHERE bilan_id=? ORDER BY id",
+                (bilan_id,),
+            ).fetchall()
+        ]
+        bilan["travaux_internes"] = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM bilan_travaux_internes WHERE bilan_id=? ORDER BY id",
+                (bilan_id,),
+            ).fetchall()
+        ]
         return bilan
     finally:
         conn.close()

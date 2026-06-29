@@ -1,16 +1,21 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGridLayout, QFrame,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QFrame,
 )
-from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 import database as db
 
 try:
     import matplotlib
+
     matplotlib.use("QtAgg")
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
     from matplotlib.figure import Figure
+
     HAS_MPL = True
 except Exception:
     HAS_MPL = False
@@ -61,7 +66,12 @@ class DashboardTab(QWidget):
         self._card_sat = MetricCard("Satisfaction client moy.")
         self._card_marge = MetricCard("Marge finale moy.")
         self._card_chantiers = MetricCard("Chantiers / Bilans")
-        for c in (self._card_bilans, self._card_sat, self._card_marge, self._card_chantiers):
+        for c in (
+            self._card_bilans,
+            self._card_sat,
+            self._card_marge,
+            self._card_chantiers,
+        ):
             hl_m.addWidget(c)
         vl.addLayout(hl_m)
 
@@ -80,10 +90,16 @@ class DashboardTab(QWidget):
 
         self._card_bilans.set_value(str(len(bilans)))
 
-        sats = [b["satisfaction_client"] for b in bilans if b.get("satisfaction_client") is not None]
+        sats = [
+            b["satisfaction_client"]
+            for b in bilans
+            if b.get("satisfaction_client") is not None
+        ]
         self._card_sat.set_value(f"{sum(sats)/len(sats):.1f}/5" if sats else "—")
 
-        marges = [b["marge_finale"] for b in bilans if b.get("marge_finale") is not None]
+        marges = [
+            b["marge_finale"] for b in bilans if b.get("marge_finale") is not None
+        ]
         self._card_marge.set_value(f"{sum(marges)/len(marges):.1f}%" if marges else "—")
 
         self._card_chantiers.set_value(f"{len(chantiers)} / {len(bilans)}")
@@ -94,24 +110,36 @@ class DashboardTab(QWidget):
         self._fig.clear()
 
         ax1 = self._fig.add_subplot(1, 2, 1)
-        sat_data = [(b["id_chantier"], b["satisfaction_client"]) for b in bilans if b.get("satisfaction_client") is not None]
+        sat_data = [
+            (b["id_chantier"], b["satisfaction_client"])
+            for b in bilans
+            if b.get("satisfaction_client") is not None
+        ]
         if sat_data:
             ids, vals = zip(*sat_data[-30:])
             ax1.bar(range(len(ids)), vals, color=BEG_BLUE, alpha=0.8)
             ax1.set_xticks(range(len(ids)))
-            ax1.set_xticklabels([str(i) for i in ids], rotation=45, ha="right", fontsize=7)
+            ax1.set_xticklabels(
+                [str(i) for i in ids], rotation=45, ha="right", fontsize=7
+            )
             ax1.set_ylim(0, 5.5)
             ax1.set_title("Satisfaction client /5", fontweight="bold", color=BEG_BLUE)
             ax1.axhline(y=3, color="#aaa", linestyle="--", linewidth=0.8)
 
         ax2 = self._fig.add_subplot(1, 2, 2)
-        marge_data = [(b["id_chantier"], b["marge_finale"]) for b in bilans if b.get("marge_finale") is not None]
+        marge_data = [
+            (b["id_chantier"], b["marge_finale"])
+            for b in bilans
+            if b.get("marge_finale") is not None
+        ]
         if marge_data:
             ids2, vals2 = zip(*marge_data[-30:])
             colors = ["#27ae60" if v >= 0 else "#c0392b" for v in vals2]
             ax2.bar(range(len(ids2)), vals2, color=colors, alpha=0.8)
             ax2.set_xticks(range(len(ids2)))
-            ax2.set_xticklabels([str(i) for i in ids2], rotation=45, ha="right", fontsize=7)
+            ax2.set_xticklabels(
+                [str(i) for i in ids2], rotation=45, ha="right", fontsize=7
+            )
             ax2.set_title("Marge finale (%)", fontweight="bold", color=BEG_BLUE)
             ax2.axhline(y=0, color="#333", linewidth=0.8)
 

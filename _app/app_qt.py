@@ -4,8 +4,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QStatusBar
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon, QPalette, QColor
+from PyQt6.QtGui import QPalette, QColor
 
 import database as db
 

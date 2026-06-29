@@ -13,7 +13,10 @@ if __name__ == "__main__":
     print(f"Bilan existant pour {ID}: {bilan_id}")
 
     c = db.get_chantier(ID)
-    print(f"\nChamps qui seraient préremplis:")
+    if c is None:
+        print(f"Chantier {ID} introuvable en base")
+        sys.exit(1)
+    print("\nChamps qui seraient préremplis:")
     print(f"  f_delai_soumission  = {c.get('delai_execution')}")
     print(f"  f_montant_base_pv   = {c.get('montant')}")
     print(f"  pp_client_nom       = {c.get('client')!r}")
@@ -37,9 +40,13 @@ if __name__ == "__main__":
 
     conn = db.get_conn()
     try:
-        raw = conn.execute("SELECT id_chantier FROM chantiers WHERE id_chantier=?", (ID,)).fetchone()
+        raw = conn.execute(
+            "SELECT id_chantier FROM chantiers WHERE id_chantier=?", (ID,)
+        ).fetchone()
         print(f"\nCorrespondance exacte en DB: {raw}")
-        raw2 = conn.execute("SELECT id_chantier FROM chantiers WHERE id_chantier=?", (int(ID),)).fetchone()
+        raw2 = conn.execute(
+            "SELECT id_chantier FROM chantiers WHERE id_chantier=?", (int(ID),)
+        ).fetchone()
         print(f"Correspondance int en DB: {raw2}")
     finally:
         conn.close()

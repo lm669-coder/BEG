@@ -2,10 +2,23 @@ import os
 from datetime import date, datetime, timedelta
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QScrollArea, QGroupBox, QLabel, QLineEdit, QTextEdit,
-    QSpinBox, QDoubleSpinBox, QComboBox, QPushButton, QRadioButton,
-    QButtonGroup, QMessageBox, QFileDialog,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QGridLayout,
+    QScrollArea,
+    QGroupBox,
+    QLabel,
+    QLineEdit,
+    QTextEdit,
+    QSpinBox,
+    QDoubleSpinBox,
+    QComboBox,
+    QPushButton,
+    QRadioButton,
+    QButtonGroup,
+    QMessageBox,
+    QFileDialog,
     QFrame,
 )
 from PyQt6.QtCore import Qt, QTimer
@@ -78,10 +91,15 @@ class PPExtraSection(DynamicSection):
         super().__init__("Ajouter une partie prenante", parent)
 
     def add_row(self, role="", nom="", relation="", evaluation=3):
-        role_e = QLineEdit(role); role_e.setPlaceholderText("Rôle")
-        nom_e = QLineEdit(nom); nom_e.setPlaceholderText("Nom")
-        rel_e = QLineEdit(relation); rel_e.setPlaceholderText("Relation / Appréciation")
-        eval_s = QSpinBox(); eval_s.setRange(1, 5); eval_s.setValue(evaluation)
+        role_e = QLineEdit(role)
+        role_e.setPlaceholderText("Rôle")
+        nom_e = QLineEdit(nom)
+        nom_e.setPlaceholderText("Nom")
+        rel_e = QLineEdit(relation)
+        rel_e.setPlaceholderText("Relation / Appréciation")
+        eval_s = QSpinBox()
+        eval_s.setRange(1, 5)
+        eval_s.setValue(evaluation)
         eval_s.setFixedWidth(55)
 
         row_widget = QWidget()
@@ -107,12 +125,14 @@ class PPExtraSection(DynamicSection):
         result = []
         for _, (role_e, nom_e, rel_e, eval_s) in self._rows:
             if role_e.text() or nom_e.text():
-                result.append({
-                    "role": role_e.text(),
-                    "nom": nom_e.text(),
-                    "relation": rel_e.text(),
-                    "evaluation": eval_s.value(),
-                })
+                result.append(
+                    {
+                        "role": role_e.text(),
+                        "nom": nom_e.text(),
+                        "relation": rel_e.text(),
+                        "evaluation": eval_s.value(),
+                    }
+                )
         return result
 
     def load(self, items: list):
@@ -131,21 +151,33 @@ class PosteSection(DynamicSection):
         super().__init__(label_add, parent)
 
     def add_row(self, denomination="", prs=0.0, pre=0.0):
-        denom_e = QLineEdit(denomination); denom_e.setPlaceholderText("Dénomination / poste")
-        prs_s = QDoubleSpinBox(); prs_s.setRange(0, 99_999_999); prs_s.setSingleStep(100)
-        prs_s.setDecimals(2); prs_s.setValue(prs or 0.0)
-        prs_s.setPrefix(""); prs_s.setSuffix(" €")
-        pre_s = QDoubleSpinBox(); pre_s.setRange(0, 99_999_999); pre_s.setSingleStep(100)
-        pre_s.setDecimals(2); pre_s.setValue(pre or 0.0)
-        pre_s.setPrefix(""); pre_s.setSuffix(" €")
-        ecart_lbl = QLabel("—"); ecart_lbl.setFixedWidth(90)
+        denom_e = QLineEdit(denomination)
+        denom_e.setPlaceholderText("Dénomination / poste")
+        prs_s = QDoubleSpinBox()
+        prs_s.setRange(0, 99_999_999)
+        prs_s.setSingleStep(100)
+        prs_s.setDecimals(2)
+        prs_s.setValue(prs or 0.0)
+        prs_s.setPrefix("")
+        prs_s.setSuffix(" €")
+        pre_s = QDoubleSpinBox()
+        pre_s.setRange(0, 99_999_999)
+        pre_s.setSingleStep(100)
+        pre_s.setDecimals(2)
+        pre_s.setValue(pre or 0.0)
+        pre_s.setPrefix("")
+        pre_s.setSuffix(" €")
+        ecart_lbl = QLabel("—")
+        ecart_lbl.setFixedWidth(90)
 
         def _update_ecart():
             ecart = pre_s.value() - prs_s.value()
             sign = "+" if ecart >= 0 else ""
             ecart_lbl.setText(f"{sign}{ecart:,.0f} €".replace(",", " "))
             color = "green" if ecart >= 0 else "#c0392b"
-            ecart_lbl.setStyleSheet(f"color:{color}; font-weight:bold; padding:3px 6px;")
+            ecart_lbl.setStyleSheet(
+                f"color:{color}; font-weight:bold; padding:3px 6px;"
+            )
 
         prs_s.valueChanged.connect(_update_ecart)
         pre_s.valueChanged.connect(_update_ecart)
@@ -176,11 +208,13 @@ class PosteSection(DynamicSection):
         result = []
         for _, (denom_e, prs_s, pre_s) in self._rows:
             if denom_e.text():
-                result.append({
-                    "denomination": denom_e.text(),
-                    "prs": prs_s.value(),
-                    "pre": pre_s.value(),
-                })
+                result.append(
+                    {
+                        "denomination": denom_e.text(),
+                        "prs": prs_s.value(),
+                        "pre": pre_s.value(),
+                    }
+                )
         return result
 
     def load(self, items: list):
@@ -200,14 +234,22 @@ class TravauxSection(DynamicSection):
         self._layout.addWidget(self._total_lbl)
 
     def add_row(self, denomination="", heures_soumission=0.0, heures_execution=0.0):
-        denom_e = QLineEdit(denomination); denom_e.setPlaceholderText("Dénomination / équipe")
-        hs_s = QDoubleSpinBox(); hs_s.setRange(0, 999_999); hs_s.setSingleStep(0.5)
-        hs_s.setDecimals(1); hs_s.setValue(heures_soumission or 0.0)
+        denom_e = QLineEdit(denomination)
+        denom_e.setPlaceholderText("Dénomination / équipe")
+        hs_s = QDoubleSpinBox()
+        hs_s.setRange(0, 999_999)
+        hs_s.setSingleStep(0.5)
+        hs_s.setDecimals(1)
+        hs_s.setValue(heures_soumission or 0.0)
         hs_s.setSuffix(" h")
-        he_s = QDoubleSpinBox(); he_s.setRange(0, 999_999); he_s.setSingleStep(0.5)
-        he_s.setDecimals(1); he_s.setValue(heures_execution or 0.0)
+        he_s = QDoubleSpinBox()
+        he_s.setRange(0, 999_999)
+        he_s.setSingleStep(0.5)
+        he_s.setDecimals(1)
+        he_s.setValue(heures_execution or 0.0)
         he_s.setSuffix(" h")
-        coeff_lbl = QLabel("—"); coeff_lbl.setFixedWidth(70)
+        coeff_lbl = QLabel("—")
+        coeff_lbl.setFixedWidth(70)
 
         def _update():
             hs = hs_s.value()
@@ -255,7 +297,9 @@ class TravauxSection(DynamicSection):
             self._total_lbl.setText(
                 f"  Total H-S: {total_hs:.1f} h  |  H-E: {total_he:.1f} h  |  Coeff. global: {coeff}"
             )
-            self._total_lbl.setStyleSheet("color:#1a3a5c; font-weight:bold; padding:2px 6px;")
+            self._total_lbl.setStyleSheet(
+                "color:#1a3a5c; font-weight:bold; padding:2px 6px;"
+            )
         else:
             self._total_lbl.setText("")
 
@@ -263,11 +307,13 @@ class TravauxSection(DynamicSection):
         result = []
         for _, (denom_e, hs_s, he_s) in self._rows:
             if denom_e.text():
-                result.append({
-                    "denomination": denom_e.text(),
-                    "heures_soumission": hs_s.value(),
-                    "heures_execution": he_s.value(),
-                })
+                result.append(
+                    {
+                        "denomination": denom_e.text(),
+                        "heures_soumission": hs_s.value(),
+                        "heures_execution": he_s.value(),
+                    }
+                )
         return result
 
     def load(self, items: list):
@@ -282,26 +328,33 @@ class TravauxSection(DynamicSection):
 
 class STSection(DynamicSection):
     CRITERIA = [
-        ("Prix", "respect_prix"), ("Délais", "respect_delais"),
-        ("Sécu.", "respect_securite"), ("Qualité", "respect_qualite"),
-        ("Réact.", "reactivite"), ("Comm.", "communication"),
+        ("Prix", "respect_prix"),
+        ("Délais", "respect_delais"),
+        ("Sécu.", "respect_securite"),
+        ("Qualité", "respect_qualite"),
+        ("Réact.", "reactivite"),
+        ("Comm.", "communication"),
     ]
 
     def __init__(self, parent=None):
         super().__init__("Ajouter un sous-traitant", parent)
 
     def add_row(self, nom="", **scores):
-        nom_e = QLineEdit(nom); nom_e.setPlaceholderText("Nom du sous-traitant")
+        nom_e = QLineEdit(nom)
+        nom_e.setPlaceholderText("Nom du sous-traitant")
 
         spin_widgets = []
         for lbl_text, key in self.CRITERIA:
             lbl = QLabel(lbl_text)
             lbl.setFixedWidth(44)
-            spin = QSpinBox(); spin.setRange(1, 5); spin.setValue(scores.get(key, 3) or 3)
+            spin = QSpinBox()
+            spin.setRange(1, 5)
+            spin.setValue(scores.get(key, 3) or 3)
             spin.setFixedWidth(46)
             spin_widgets.append((lbl, spin, key))
 
-        avg_lbl = QLabel("—"); avg_lbl.setFixedWidth(60)
+        avg_lbl = QLabel("—")
+        avg_lbl.setFixedWidth(60)
         avg_lbl.setStyleSheet("font-weight:bold; color:#1a3a5c; padding:2px 4px;")
 
         def _update_avg():
@@ -347,7 +400,7 @@ class STSection(DynamicSection):
         for item in items:
             self.add_row(
                 nom=item.get("nom", ""),
-                **{key: item.get(key, 3) for _, key in self.CRITERIA}
+                **{key: item.get(key, 3) for _, key in self.CRITERIA},
             )
 
 
@@ -456,7 +509,12 @@ class FormulaireTab(QWidget):
         self._lbl_gestionnaire = _info_label("")
         self._lbl_client = _info_label("")
         self._lbl_secteur = _info_label("")
-        for lbl in (self._lbl_intitule, self._lbl_gestionnaire, self._lbl_client, self._lbl_secteur):
+        for lbl in (
+            self._lbl_intitule,
+            self._lbl_gestionnaire,
+            self._lbl_client,
+            self._lbl_secteur,
+        ):
             info_hl.addWidget(lbl, 1)
         self._info_chantier.setVisible(False)
         self._vl.addWidget(self._info_chantier)
@@ -505,9 +563,11 @@ class FormulaireTab(QWidget):
             self._delai_complementaire.setValue(int(dec["delai"]))
         if dec["montant"]:
             self._montant_decomptes.setValue(float(dec["montant"]))
-        for widget, key in [(self._rp_demandee, "rp_demandee"),
-                            (self._rp_realisee, "rp_realisee"),
-                            (self._rp_statut, "rp_statut")]:
+        for widget, key in [
+            (self._rp_demandee, "rp_demandee"),
+            (self._rp_realisee, "rp_realisee"),
+            (self._rp_statut, "rp_statut"),
+        ]:
             if ch.get(key):
                 widget.setText(str(ch[key]))
         if ch.get("prix_de_revient"):
@@ -529,29 +589,49 @@ class FormulaireTab(QWidget):
 
         headers = ["", "Nom", "Relation / Appréciation", "Éval. /5"]
         for col, h in enumerate(headers):
-            lbl = QLabel(h); lbl.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+            lbl = QLabel(h)
+            lbl.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
             gl.addWidget(lbl, 0, col)
 
         self._pp_client_nom = QLineEdit()
         self._pp_client_rel = QLineEdit()
-        self._pp_client_eval = QSpinBox(); self._pp_client_eval.setRange(1, 5); self._pp_client_eval.setValue(3)
+        self._pp_client_eval = QSpinBox()
+        self._pp_client_eval.setRange(1, 5)
+        self._pp_client_eval.setValue(3)
         self._pp_client_eval.setFixedWidth(55)
 
         self._pp_arch_nom = QLineEdit()
         self._pp_arch_rel = QLineEdit()
-        self._pp_arch_eval = QSpinBox(); self._pp_arch_eval.setRange(1, 5); self._pp_arch_eval.setValue(3)
+        self._pp_arch_eval = QSpinBox()
+        self._pp_arch_eval.setRange(1, 5)
+        self._pp_arch_eval.setValue(3)
         self._pp_arch_eval.setFixedWidth(55)
 
         self._pp_be_nom = QLineEdit()
         self._pp_be_rel = QLineEdit()
-        self._pp_be_eval = QSpinBox(); self._pp_be_eval.setRange(1, 5); self._pp_be_eval.setValue(3)
+        self._pp_be_eval = QSpinBox()
+        self._pp_be_eval.setRange(1, 5)
+        self._pp_be_eval.setValue(3)
         self._pp_be_eval.setFixedWidth(55)
 
-        for row, (role, nom_e, rel_e, eval_s) in enumerate([
-            ("Client", self._pp_client_nom, self._pp_client_rel, self._pp_client_eval),
-            ("Architecte", self._pp_arch_nom, self._pp_arch_rel, self._pp_arch_eval),
-            ("Bureau d'étude", self._pp_be_nom, self._pp_be_rel, self._pp_be_eval),
-        ], start=1):
+        for row, (role, nom_e, rel_e, eval_s) in enumerate(
+            [
+                (
+                    "Client",
+                    self._pp_client_nom,
+                    self._pp_client_rel,
+                    self._pp_client_eval,
+                ),
+                (
+                    "Architecte",
+                    self._pp_arch_nom,
+                    self._pp_arch_rel,
+                    self._pp_arch_eval,
+                ),
+                ("Bureau d'étude", self._pp_be_nom, self._pp_be_rel, self._pp_be_eval),
+            ],
+            start=1,
+        ):
             gl.addWidget(QLabel(role), row, 0)
             gl.addWidget(nom_e, row, 1)
             gl.addWidget(rel_e, row, 2)
@@ -572,10 +652,14 @@ class FormulaireTab(QWidget):
         grp_delai.setTitle("Délais")
         hl = QHBoxLayout(grp_delai)
 
-        self._delai_soumission = QSpinBox(); self._delai_soumission.setRange(0, 9999)
-        self._delai_contractuel = QSpinBox(); self._delai_contractuel.setRange(0, 9999)
-        self._delai_complementaire = QSpinBox(); self._delai_complementaire.setRange(0, 9999)
-        self._delai_reel = QSpinBox(); self._delai_reel.setRange(0, 9999)
+        self._delai_soumission = QSpinBox()
+        self._delai_soumission.setRange(0, 9999)
+        self._delai_contractuel = QSpinBox()
+        self._delai_contractuel.setRange(0, 9999)
+        self._delai_complementaire = QSpinBox()
+        self._delai_complementaire.setRange(0, 9999)
+        self._delai_reel = QSpinBox()
+        self._delai_reel.setRange(0, 9999)
         self._unite_delai = QComboBox()
         self._unite_delai.addItems(["JC", "JO", "semaines", "mois"])
 
@@ -601,8 +685,12 @@ class FormulaireTab(QWidget):
         hl.addWidget(self._respect_lbl)
         hl.addStretch()
 
-        for s in (self._delai_soumission, self._delai_contractuel,
-                  self._delai_complementaire, self._delai_reel):
+        for s in (
+            self._delai_soumission,
+            self._delai_contractuel,
+            self._delai_complementaire,
+            self._delai_reel,
+        ):
             s.valueChanged.connect(self._update_calculs)
         self._unite_delai.currentTextChanged.connect(self._update_calculs)
 
@@ -614,11 +702,15 @@ class FormulaireTab(QWidget):
         grp_bud.setTitle("Budget")
         hl2 = QHBoxLayout(grp_bud)
 
-        self._montant_base = QDoubleSpinBox(); self._montant_base.setRange(0, 999_999_999)
-        self._montant_base.setSingleStep(1000); self._montant_base.setDecimals(2)
+        self._montant_base = QDoubleSpinBox()
+        self._montant_base.setRange(0, 999_999_999)
+        self._montant_base.setSingleStep(1000)
+        self._montant_base.setDecimals(2)
         self._montant_base.setSuffix(" €")
-        self._montant_decomptes = QDoubleSpinBox(); self._montant_decomptes.setRange(0, 999_999_999)
-        self._montant_decomptes.setSingleStep(1000); self._montant_decomptes.setDecimals(2)
+        self._montant_decomptes = QDoubleSpinBox()
+        self._montant_decomptes.setRange(0, 999_999_999)
+        self._montant_decomptes.setSingleStep(1000)
+        self._montant_decomptes.setDecimals(2)
         self._montant_decomptes.setSuffix(" €")
         self._total_pv_lbl = QLabel("0 €")
         self._total_pv_lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
@@ -655,14 +747,20 @@ class FormulaireTab(QWidget):
         grp_pr.setTitle("Prix de Revient & Marges")
         hl3 = QHBoxLayout(grp_pr)
 
-        self._prix_de_revient = QDoubleSpinBox(); self._prix_de_revient.setRange(0, 999_999_999)
-        self._prix_de_revient.setSingleStep(1000); self._prix_de_revient.setDecimals(2)
+        self._prix_de_revient = QDoubleSpinBox()
+        self._prix_de_revient.setRange(0, 999_999_999)
+        self._prix_de_revient.setSingleStep(1000)
+        self._prix_de_revient.setDecimals(2)
         self._prix_de_revient.setSuffix(" €")
-        self._marge_devis = QDoubleSpinBox(); self._marge_devis.setRange(-100, 100)
-        self._marge_devis.setSingleStep(0.1); self._marge_devis.setDecimals(2)
+        self._marge_devis = QDoubleSpinBox()
+        self._marge_devis.setRange(-100, 100)
+        self._marge_devis.setSingleStep(0.1)
+        self._marge_devis.setDecimals(2)
         self._marge_devis.setSuffix(" %")
-        self._marge_finale = QDoubleSpinBox(); self._marge_finale.setRange(-100, 100)
-        self._marge_finale.setSingleStep(0.1); self._marge_finale.setDecimals(2)
+        self._marge_finale = QDoubleSpinBox()
+        self._marge_finale.setRange(-100, 100)
+        self._marge_finale.setSingleStep(0.1)
+        self._marge_finale.setDecimals(2)
         self._marge_finale.setSuffix(" %")
 
         for lbl_text, widget in [
@@ -681,12 +779,17 @@ class FormulaireTab(QWidget):
         grp_rp = QGroupBox()
         grp_rp.setTitle("Retenues (RP)")
         hl4 = QHBoxLayout(grp_rp)
-        self._rp_demandee = QLineEdit(); self._rp_demandee.setPlaceholderText("RP demandée")
-        self._rp_realisee = QLineEdit(); self._rp_realisee.setPlaceholderText("RP réalisée")
-        self._rp_statut = QLineEdit(); self._rp_statut.setPlaceholderText("Statut RP")
-        for lbl_text, widget in [("RP demandée", self._rp_demandee),
-                                  ("RP réalisée", self._rp_realisee),
-                                  ("Statut RP", self._rp_statut)]:
+        self._rp_demandee = QLineEdit()
+        self._rp_demandee.setPlaceholderText("RP demandée")
+        self._rp_realisee = QLineEdit()
+        self._rp_realisee.setPlaceholderText("RP réalisée")
+        self._rp_statut = QLineEdit()
+        self._rp_statut.setPlaceholderText("Statut RP")
+        for lbl_text, widget in [
+            ("RP demandée", self._rp_demandee),
+            ("RP réalisée", self._rp_realisee),
+            ("Statut RP", self._rp_statut),
+        ]:
             vl = QVBoxLayout()
             vl.addWidget(QLabel(lbl_text))
             vl.addWidget(widget)
@@ -735,7 +838,9 @@ class FormulaireTab(QWidget):
                     f"OC: {oc_raw}  →  Date fin théorique : {end.strftime('%d/%m/%Y')} "
                     f"({delai_base}+{dcomp} {unite})"
                 )
-                self._date_fin_lbl.setStyleSheet("color:#27ae60; font-weight:bold; padding:2px 6px;")
+                self._date_fin_lbl.setStyleSheet(
+                    "color:#27ae60; font-weight:bold; padding:2px 6px;"
+                )
             else:
                 self._date_fin_lbl.setText(f"Ordre de commencer : {oc_raw}")
         else:
@@ -773,25 +878,31 @@ class FormulaireTab(QWidget):
         hl = QHBoxLayout()
         vl_q = QVBoxLayout()
         vl_q.addWidget(QLabel("Niveau de qualité global"))
-        self._niveau_qualite = QTextEdit(); self._niveau_qualite.setFixedHeight(70)
+        self._niveau_qualite = QTextEdit()
+        self._niveau_qualite.setFixedHeight(70)
         vl_q.addWidget(self._niveau_qualite)
         hl.addLayout(vl_q, 4)
 
         vl_s = QVBoxLayout()
         vl_s.addWidget(QLabel("Satisfaction client /5"))
-        self._satisfaction_client = QSpinBox(); self._satisfaction_client.setRange(1, 5)
+        self._satisfaction_client = QSpinBox()
+        self._satisfaction_client.setRange(1, 5)
         self._satisfaction_client.setValue(3)
         vl_s.addWidget(self._satisfaction_client)
         vl_s.addStretch()
         hl.addLayout(vl_s, 1)
         self._vl.addLayout(hl)
 
-        self._vl.addWidget(QLabel("Travaux non satisfaisants (description + responsable) :"))
-        self._travaux_non_sat = QTextEdit(); self._travaux_non_sat.setFixedHeight(70)
+        self._vl.addWidget(
+            QLabel("Travaux non satisfaisants (description + responsable) :")
+        )
+        self._travaux_non_sat = QTextEdit()
+        self._travaux_non_sat.setFixedHeight(70)
         self._vl.addWidget(self._travaux_non_sat)
 
         self._vl.addWidget(QLabel("Améliorations proposées :"))
-        self._ameliorations_qualite = QTextEdit(); self._ameliorations_qualite.setFixedHeight(70)
+        self._ameliorations_qualite = QTextEdit()
+        self._ameliorations_qualite.setFixedHeight(70)
         self._vl.addWidget(self._ameliorations_qualite)
 
     # ── Section 6 : Sécurité ──────────────────────────────────────────────
@@ -813,11 +924,13 @@ class FormulaireTab(QWidget):
         self._vl.addLayout(hl)
 
         self._vl.addWidget(QLabel("Description des accidents :"))
-        self._desc_accidents = QTextEdit(); self._desc_accidents.setFixedHeight(70)
+        self._desc_accidents = QTextEdit()
+        self._desc_accidents.setFixedHeight(70)
         self._vl.addWidget(self._desc_accidents)
 
         self._vl.addWidget(QLabel("Améliorations / mesures préventives :"))
-        self._ameliorations_securite = QTextEdit(); self._ameliorations_securite.setFixedHeight(70)
+        self._ameliorations_securite = QTextEdit()
+        self._ameliorations_securite.setFixedHeight(70)
         self._vl.addWidget(self._ameliorations_securite)
 
     # ── Section 7 : Sous-traitants ────────────────────────────────────────
@@ -828,20 +941,26 @@ class FormulaireTab(QWidget):
         self._vl.addWidget(self._st_section)
 
         self._vl.addWidget(QLabel("Notes complémentaires sous-traitants :"))
-        self._notes_st = QTextEdit(); self._notes_st.setFixedHeight(60)
+        self._notes_st = QTextEdit()
+        self._notes_st.setFixedHeight(60)
         self._vl.addWidget(self._notes_st)
 
     # ── Section 8 : Commentaire ───────────────────────────────────────────
     def _build_section8(self):
         self._vl.addWidget(_section_label("8. COMMENTAIRE GÉNÉRAL / SYNTHÈSE"))
-        self._vl.addWidget(QLabel("Points forts, points faibles, enseignements pour l'avenir :"))
-        self._commentaire = QTextEdit(); self._commentaire.setFixedHeight(100)
+        self._vl.addWidget(
+            QLabel("Points forts, points faibles, enseignements pour l'avenir :")
+        )
+        self._commentaire = QTextEdit()
+        self._commentaire.setFixedHeight(100)
         self._vl.addWidget(self._commentaire)
 
     # ── Actions ───────────────────────────────────────────────────────────
     def _build_actions(self):
-        sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet("color:#b8cce4;"); self._vl.addWidget(sep)
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("color:#b8cce4;")
+        self._vl.addWidget(sep)
 
         hl = QHBoxLayout()
         btn_save = QPushButton("💾 Enregistrer")
@@ -866,19 +985,32 @@ class FormulaireTab(QWidget):
     # ── Data helpers ──────────────────────────────────────────────────────
     def _collect_pp_fixed(self):
         return [
-            {"role": "Client", "nom": self._pp_client_nom.text(),
-             "relation": self._pp_client_rel.text(), "evaluation": self._pp_client_eval.value()},
-            {"role": "Architecte", "nom": self._pp_arch_nom.text(),
-             "relation": self._pp_arch_rel.text(), "evaluation": self._pp_arch_eval.value()},
-            {"role": "Bureau d'étude", "nom": self._pp_be_nom.text(),
-             "relation": self._pp_be_rel.text(), "evaluation": self._pp_be_eval.value()},
+            {
+                "role": "Client",
+                "nom": self._pp_client_nom.text(),
+                "relation": self._pp_client_rel.text(),
+                "evaluation": self._pp_client_eval.value(),
+            },
+            {
+                "role": "Architecte",
+                "nom": self._pp_arch_nom.text(),
+                "relation": self._pp_arch_rel.text(),
+                "evaluation": self._pp_arch_eval.value(),
+            },
+            {
+                "role": "Bureau d'étude",
+                "nom": self._pp_be_nom.text(),
+                "relation": self._pp_be_rel.text(),
+                "evaluation": self._pp_be_eval.value(),
+            },
         ]
 
     def _build_data(self) -> dict:
         return {
             "id": self._loaded_id,
             "id_chantier": self._id_chantier.text().strip(),
-            "date_bilan": self._date_bilan.text().strip() or date.today().strftime("%d/%m/%Y"),
+            "date_bilan": self._date_bilan.text().strip()
+            or date.today().strftime("%d/%m/%Y"),
             "delai_soumission": self._delai_soumission.value() or None,
             "delai_contractuel": self._delai_contractuel.value() or None,
             "delai_complementaire": self._delai_complementaire.value() or None,
@@ -898,7 +1030,8 @@ class FormulaireTab(QWidget):
             "ameliorations_qualite": self._ameliorations_qualite.toPlainText() or None,
             "accidents_chantier": "Oui" if self._accident_oui.isChecked() else "Non",
             "description_accidents": self._desc_accidents.toPlainText() or None,
-            "ameliorations_securite": self._ameliorations_securite.toPlainText() or None,
+            "ameliorations_securite": self._ameliorations_securite.toPlainText()
+            or None,
             "commentaire_general": self._commentaire.toPlainText() or None,
             "notes_sous_traitants": self._notes_st.toPlainText() or None,
             "parties_prenantes": self._collect_pp_fixed() + self._pp_extra.get_data(),
@@ -910,7 +1043,9 @@ class FormulaireTab(QWidget):
 
     def _save(self):
         if not self._id_chantier.text().strip():
-            QMessageBox.warning(self, "Champ obligatoire", "L'ID Chantier est obligatoire.")
+            QMessageBox.warning(
+                self, "Champ obligatoire", "L'ID Chantier est obligatoire."
+            )
             return
         data = self._build_data()
         new_id = db.save_bilan(data)
@@ -921,15 +1056,27 @@ class FormulaireTab(QWidget):
     def _generate_pdf(self):
         id_c = self._id_chantier.text().strip()
         if not id_c:
-            QMessageBox.warning(self, "Champ obligatoire", "L'ID Chantier est obligatoire.")
+            QMessageBox.warning(
+                self, "Champ obligatoire", "L'ID Chantier est obligatoire."
+            )
             return
         data = self._build_data()
-        ch = self._chantier_info or {"intitule": "", "gestionnaire": "", "client": "", "secteur": "", "province": ""}
+        ch = self._chantier_info or {
+            "intitule": "",
+            "gestionnaire": "",
+            "client": "",
+            "secteur": "",
+            "province": "",
+        }
         pdf_bytes = pdf_export.generate_pdf(data, ch, self._montant_facture)
         fname = f"Bilan_{id_c}_{date.today().strftime('%Y%m%d')}.pdf"
-        default_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "PDFs")
+        default_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "PDFs"
+        )
         os.makedirs(default_dir, exist_ok=True)
-        path, _ = QFileDialog.getSaveFileName(self, "Enregistrer le PDF", os.path.join(default_dir, fname), "PDF (*.pdf)")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Enregistrer le PDF", os.path.join(default_dir, fname), "PDF (*.pdf)"
+        )
         if path:
             with open(path, "wb") as f:
                 f.write(pdf_bytes)
@@ -943,8 +1090,9 @@ class FormulaireTab(QWidget):
         if not self._loaded_id:
             return
         reply = QMessageBox.question(
-            self, "Confirmer la suppression",
-            f"Supprimer définitivement ce bilan ? Cette action est irréversible.",
+            self,
+            "Confirmer la suppression",
+            "Supprimer définitivement ce bilan ? Cette action est irréversible.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
@@ -960,17 +1108,32 @@ class FormulaireTab(QWidget):
         self._montant_facture = 0.0
         self._id_chantier.setText("")
         self._date_bilan.setText(date.today().strftime("%d/%m/%Y"))
-        for spin in (self._delai_soumission, self._delai_contractuel,
-                     self._delai_complementaire, self._delai_reel):
+        for spin in (
+            self._delai_soumission,
+            self._delai_contractuel,
+            self._delai_complementaire,
+            self._delai_reel,
+        ):
             spin.setValue(0)
         self._unite_delai.setCurrentText("JC")
-        for s in (self._montant_base, self._montant_decomptes, self._prix_de_revient,
-                  self._marge_devis, self._marge_finale):
+        for s in (
+            self._montant_base,
+            self._montant_decomptes,
+            self._prix_de_revient,
+            self._marge_devis,
+            self._marge_finale,
+        ):
             s.setValue(0.0)
         for w in (self._rp_demandee, self._rp_realisee, self._rp_statut):
             w.setText("")
-        for w in (self._pp_client_nom, self._pp_client_rel, self._pp_arch_nom,
-                  self._pp_arch_rel, self._pp_be_nom, self._pp_be_rel):
+        for w in (
+            self._pp_client_nom,
+            self._pp_client_rel,
+            self._pp_arch_nom,
+            self._pp_arch_rel,
+            self._pp_be_nom,
+            self._pp_be_rel,
+        ):
             w.setText("")
         for s in (self._pp_client_eval, self._pp_arch_eval, self._pp_be_eval):
             s.setValue(3)
@@ -979,8 +1142,15 @@ class FormulaireTab(QWidget):
         self._postes_surb.clear_rows()
         self._travaux.clear_rows()
         self._st_section.clear_rows()
-        for te in (self._niveau_qualite, self._travaux_non_sat, self._ameliorations_qualite,
-                   self._desc_accidents, self._ameliorations_securite, self._commentaire, self._notes_st):
+        for te in (
+            self._niveau_qualite,
+            self._travaux_non_sat,
+            self._ameliorations_qualite,
+            self._desc_accidents,
+            self._ameliorations_securite,
+            self._commentaire,
+            self._notes_st,
+        ):
             te.setPlainText("")
         self._satisfaction_client.setValue(3)
         self._accident_non.setChecked(True)
@@ -998,7 +1168,9 @@ class FormulaireTab(QWidget):
         self._id_chantier.setText(str(bilan["id_chantier"]))
         self._id_chantier.blockSignals(False)
 
-        self._date_bilan.setText(bilan.get("date_bilan") or date.today().strftime("%d/%m/%Y"))
+        self._date_bilan.setText(
+            bilan.get("date_bilan") or date.today().strftime("%d/%m/%Y")
+        )
         self._delai_soumission.setValue(bilan.get("delai_soumission") or 0)
         self._delai_contractuel.setValue(bilan.get("delai_contractuel") or 0)
         self._delai_complementaire.setValue(bilan.get("delai_complementaire") or 0)
@@ -1017,24 +1189,37 @@ class FormulaireTab(QWidget):
         self._niveau_qualite.setPlainText(bilan.get("niveau_qualite") or "")
         self._satisfaction_client.setValue(bilan.get("satisfaction_client") or 3)
         self._travaux_non_sat.setPlainText(bilan.get("travaux_non_satisfaisants") or "")
-        self._ameliorations_qualite.setPlainText(bilan.get("ameliorations_qualite") or "")
+        self._ameliorations_qualite.setPlainText(
+            bilan.get("ameliorations_qualite") or ""
+        )
         if (bilan.get("accidents_chantier") or "Non") == "Oui":
             self._accident_oui.setChecked(True)
         else:
             self._accident_non.setChecked(True)
         self._desc_accidents.setPlainText(bilan.get("description_accidents") or "")
-        self._ameliorations_securite.setPlainText(bilan.get("ameliorations_securite") or "")
+        self._ameliorations_securite.setPlainText(
+            bilan.get("ameliorations_securite") or ""
+        )
         self._commentaire.setPlainText(bilan.get("commentaire_general") or "")
         self._notes_st.setPlainText(bilan.get("notes_sous_traitants") or "")
 
         # PP fixes
-        pp_fixed = {p["role"]: p for p in bilan.get("parties_prenantes", [])
-                    if p.get("role") in _FIXED_PP_ROLES}
-        pp_extra = [p for p in bilan.get("parties_prenantes", [])
-                    if p.get("role") not in _FIXED_PP_ROLES]
+        pp_fixed = {
+            p["role"]: p
+            for p in bilan.get("parties_prenantes", [])
+            if p.get("role") in _FIXED_PP_ROLES
+        }
+        pp_extra = [
+            p
+            for p in bilan.get("parties_prenantes", [])
+            if p.get("role") not in _FIXED_PP_ROLES
+        ]
 
         for role, (nom_e, rel_e, eval_s) in [
-            ("Client", (self._pp_client_nom, self._pp_client_rel, self._pp_client_eval)),
+            (
+                "Client",
+                (self._pp_client_nom, self._pp_client_rel, self._pp_client_eval),
+            ),
             ("Architecte", (self._pp_arch_nom, self._pp_arch_rel, self._pp_arch_eval)),
             ("Bureau d'étude", (self._pp_be_nom, self._pp_be_rel, self._pp_be_eval)),
         ]:
