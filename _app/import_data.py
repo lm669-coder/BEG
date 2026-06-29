@@ -157,7 +157,7 @@ def import_chantiers(source, sheet_name, conn,
         conn.execute("DELETE FROM chantiers")
         conn.commit()
 
-    existing_ids: set = set()
+    existing_ids: set[str] = set()
     if not overwrite:
         existing_ids = {r[0] for r in conn.execute("SELECT id_chantier FROM chantiers").fetchall()}
 
@@ -318,11 +318,12 @@ def import_ea(source, sheet_name, conn,
 
     if col_id is None:
         col_id = _find_col(headers_norm, "num chantier", "id chantier", "chantier") or 0
+    _EA_MONTANT_FALLBACK_COL = 21  # colonne V dans le format EA BEG standard
     if col_montant is None:
         col_montant = (
             _find_col(headers_norm, "revision", "facture", "montant facture") or
             _find_col(headers_norm, "montant") or
-            21
+            _EA_MONTANT_FALLBACK_COL
         )
 
     col_lot      = _find_col(headers_norm, "lot")
