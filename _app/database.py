@@ -1,7 +1,13 @@
 import sqlite3
 import os
+import sys
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "beg_rmi.db")
+if getattr(sys, "frozen", False):
+    _BASE = os.path.dirname(sys.executable)
+else:
+    _BASE = os.path.dirname(os.path.abspath(__file__))
+
+DB_PATH = os.path.join(_BASE, "BEG_Data.db")
 
 _BILAN_CHILD_TABLES = (
     "bilan_parties_prenantes",
