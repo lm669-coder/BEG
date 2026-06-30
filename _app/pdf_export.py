@@ -1,5 +1,6 @@
 import io
 import os
+import sys
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -17,9 +18,12 @@ from reportlab.platypus import (
 )
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 
-LOGO_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Données", "logo.png"
-)
+if getattr(sys, "frozen", False):
+    _BASE = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+else:
+    _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+LOGO_PATH = os.path.join(_BASE, "Données", "logo.png")
 
 # ── Palette Apple-inspired ────────────────────────────────────────────────────
 C_DARK = colors.HexColor("#1d1d1f")  # primary text

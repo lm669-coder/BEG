@@ -61,7 +61,7 @@ class DynamicSection(QWidget):
         self._btn_add = QPushButton(f"+ {label_add}")
         self._btn_add.setObjectName("btn_add")
         self._layout.addWidget(self._btn_add)
-        self._btn_add.clicked.connect(self.add_row)
+        self._btn_add.clicked.connect(lambda: self.add_row())
 
     def _insert_row_widget(self, row_widget: QWidget):
         idx = self._layout.indexOf(self._btn_add)
