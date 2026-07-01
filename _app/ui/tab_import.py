@@ -166,6 +166,7 @@ class ImportTab(QWidget):
     def _import_ch(self):
         if not self._file_ch_path:
             return
+        conn = None
         try:
             with open(self._file_ch_path, "rb") as f:
                 conn = db.get_conn()
@@ -177,7 +178,6 @@ class ImportTab(QWidget):
                     first_data_row=self._data_ch.value(),
                     overwrite=self._overwrite_ch.isChecked(),
                 )
-                conn.close()
             self._msg_ch.setText(
                 f"✅ {ok} importé(s), {skip} ignoré(s) (déjà présents)."
             )
@@ -186,6 +186,9 @@ class ImportTab(QWidget):
         except Exception as e:
             self._msg_ch.setText(f"Erreur : {e}")
             self._msg_ch.setStyleSheet("color:red;")
+        finally:
+            if conn:
+                conn.close()
 
     # ── Bloc EA ───────────────────────────────────────────────────────────
     def _build_bloc_ea(self) -> QGroupBox:
@@ -218,6 +221,12 @@ class ImportTab(QWidget):
         self._data_ea.setRange(2, 20)
         self._data_ea.setValue(2)
         hl2.addWidget(self._data_ea)
+        hl2.addWidget(QLabel("Col. montant (0=auto) :"))
+        self._col_montant_ea = QSpinBox()
+        self._col_montant_ea.setRange(0, 100)
+        self._col_montant_ea.setValue(0)
+        self._col_montant_ea.setToolTip("N° de colonne (1=A, 2=B, …). 0 = détection automatique.")
+        hl2.addWidget(self._col_montant_ea)
         hl2.addStretch()
         vl.addLayout(hl2)
 
@@ -290,24 +299,29 @@ class ImportTab(QWidget):
     def _import_ea(self):
         if not self._file_ea_path:
             return
+        conn = None
         try:
             with open(self._file_ea_path, "rb") as f:
                 conn = db.get_conn()
+                col_m = self._col_montant_ea.value()
                 ok, det = imp.import_ea(
                     f,
                     self._sheet_ea.currentText(),
                     conn,
                     header_row=self._header_ea.value(),
                     first_data_row=self._data_ea.value(),
+                    col_montant=col_m - 1 if col_m > 0 else None,
                     overwrite=self._overwrite_ea.isChecked(),
                 )
-                conn.close()
             self._msg_ea.setText(f"✅ {ok} ligne(s) EA importée(s). Colonnes : {det}")
             self._msg_ea.setStyleSheet("color:green;")
             self._refresh_counts()
         except Exception as e:
             self._msg_ea.setText(f"Erreur : {e}")
             self._msg_ea.setStyleSheet("color:red;")
+        finally:
+            if conn:
+                conn.close()
 
     # ── Bloc décomptes ─────────────────────────────────────────────────────
     def _build_bloc_decomptes(self) -> QGroupBox:
@@ -412,6 +426,7 @@ class ImportTab(QWidget):
     def _import_dec(self):
         if not self._file_dec_path:
             return
+        conn = None
         try:
             with open(self._file_dec_path, "rb") as f:
                 conn = db.get_conn()
@@ -423,13 +438,15 @@ class ImportTab(QWidget):
                     first_data_row=self._data_dec.value(),
                     overwrite=self._overwrite_dec.isChecked(),
                 )
-                conn.close()
             self._msg_dec.setText(f"✅ {ok} ligne(s) importée(s). Colonnes : {det}")
             self._msg_dec.setStyleSheet("color:green;")
             self._refresh_counts()
         except Exception as e:
             self._msg_dec.setText(f"Erreur : {e}")
             self._msg_dec.setStyleSheet("color:red;")
+        finally:
+            if conn:
+                conn.close()
 
     # ── Helper ─────────────────────────────────────────────────────────────
     @staticmethod
