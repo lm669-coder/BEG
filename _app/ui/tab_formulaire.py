@@ -553,7 +553,7 @@ class FormulaireTab(QWidget):
 
     def _prefill_from_chantier(self, ch: dict, id_c: str):
         if ch.get("delai_execution"):
-            self._delai_soumission.setValue(int(ch["delai_execution"]))
+            self._delai_contractuel.setValue(int(ch["delai_execution"]))
         if ch.get("montant"):
             self._montant_base.setValue(float(ch["montant"]))
         if ch.get("client"):
@@ -563,13 +563,6 @@ class FormulaireTab(QWidget):
             self._delai_complementaire.setValue(int(dec["delai"]))
         if dec["montant"]:
             self._montant_decomptes.setValue(float(dec["montant"]))
-        for widget, key in [
-            (self._rp_demandee, "rp_demandee"),
-            (self._rp_realisee, "rp_realisee"),
-            (self._rp_statut, "rp_statut"),
-        ]:
-            if ch.get(key):
-                widget.setText(str(ch[key]))
         if ch.get("prix_de_revient"):
             pr = float(ch["prix_de_revient"])
             self._prix_de_revient.setValue(pr)
@@ -647,57 +640,78 @@ class FormulaireTab(QWidget):
     def _build_section3(self):
         self._vl.addWidget(_section_label("3. PERFORMANCE"))
 
-        # Délais
+        # ── Délais ────────────────────────────────────────────────────────
         grp_delai = QGroupBox()
         grp_delai.setTitle("Délais")
-        hl = QHBoxLayout(grp_delai)
+        vl_d = QVBoxLayout(grp_delai)
 
-        self._delai_soumission = QSpinBox()
-        self._delai_soumission.setRange(0, 9999)
-        self._delai_contractuel = QSpinBox()
-        self._delai_contractuel.setRange(0, 9999)
-        self._delai_complementaire = QSpinBox()
-        self._delai_complementaire.setRange(0, 9999)
-        self._delai_reel = QSpinBox()
-        self._delai_reel.setRange(0, 9999)
-        self._unite_delai = QComboBox()
-        self._unite_delai.addItems(["JC", "JO", "semaines", "mois"])
-
-        self._respect_lbl = QLabel("")
-        self._respect_lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        self._date_fin_lbl = QLabel("")
-
-        for lbl, spin in [
-            ("Soumission", self._delai_soumission),
-            ("Contractuel", self._delai_contractuel),
-            ("Complémentaire", self._delai_complementaire),
-            ("Réel", self._delai_reel),
+        hl_d1 = QHBoxLayout()
+        for lbl_txt, attr in [
+            ("Délai contractuel", "_delai_contractuel"),
+            ("Délai complémentaire", "_delai_complementaire"),
         ]:
-            vl = QVBoxLayout()
-            vl.addWidget(QLabel(lbl))
-            vl.addWidget(spin)
-            hl.addLayout(vl)
+            spin = QSpinBox()
+            spin.setRange(0, 9999)
+            setattr(self, attr, spin)
+            vl_s = QVBoxLayout()
+            vl_s.addWidget(QLabel(lbl_txt))
+            vl_s.addWidget(spin)
+            hl_d1.addLayout(vl_s)
 
         vl_u = QVBoxLayout()
         vl_u.addWidget(QLabel("Unité"))
+        self._unite_delai = QComboBox()
+        self._unite_delai.addItems(["JC", "JO", "semaines", "mois"])
         vl_u.addWidget(self._unite_delai)
-        hl.addLayout(vl_u)
-        hl.addWidget(self._respect_lbl)
-        hl.addStretch()
+        hl_d1.addLayout(vl_u)
 
-        for s in (
-            self._delai_soumission,
-            self._delai_contractuel,
-            self._delai_complementaire,
-            self._delai_reel,
-        ):
+        vl_tot = QVBoxLayout()
+        vl_tot.addWidget(QLabel("Total autorisé (calculé)"))
+        self._delai_reel = QLabel("—")
+        self._delai_reel.setStyleSheet(
+            "font-weight:bold; color:#1a3a5c; padding:4px 8px;"
+            "background:#edf1f7; border-radius:4px;"
+        )
+        vl_tot.addWidget(self._delai_reel)
+        hl_d1.addLayout(vl_tot)
+        hl_d1.addStretch()
+        vl_d.addLayout(hl_d1)
+
+        self._date_fin_lbl = QLabel("")
+        vl_d.addWidget(self._date_fin_lbl)
+
+        # Bloc comparaison OC / RP (visible si données chantier disponibles)
+        self._rp_compare_widget = QWidget()
+        rp_vl = QVBoxLayout(self._rp_compare_widget)
+        rp_vl.setContentsMargins(0, 6, 0, 0)
+        rp_vl.setSpacing(4)
+        rp_title = QLabel("Suivi délai — Restitution cautionnement (RP)")
+        rp_title.setStyleSheet("color:#1a3a5c; font-weight:600;")
+        rp_vl.addWidget(rp_title)
+        rp_hl = QHBoxLayout()
+        rp_hl.setSpacing(8)
+        self._lbl_oc = QLabel("—")
+        self._lbl_rp_dem = QLabel("—")
+        self._lbl_rp_real = QLabel("—")
+        self._lbl_rp_ecart = QLabel("—")
+        _card = (
+            "background:#edf1f7; color:#1a3a5c; padding:6px 10px;"
+            "border-radius:4px; min-width:130px;"
+        )
+        for lbl in (self._lbl_oc, self._lbl_rp_dem, self._lbl_rp_real, self._lbl_rp_ecart):
+            lbl.setWordWrap(True)
+            lbl.setStyleSheet(_card)
+            rp_hl.addWidget(lbl, 1)
+        rp_vl.addLayout(rp_hl)
+        self._rp_compare_widget.setVisible(False)
+        vl_d.addWidget(self._rp_compare_widget)
+
+        for s in (self._delai_contractuel, self._delai_complementaire):
             s.valueChanged.connect(self._update_calculs)
         self._unite_delai.currentTextChanged.connect(self._update_calculs)
-
         self._vl.addWidget(grp_delai)
-        self._vl.addWidget(self._date_fin_lbl)
 
-        # Budget
+        # ── Budget ────────────────────────────────────────────────────────
         grp_bud = QGroupBox()
         grp_bud.setTitle("Budget")
         hl2 = QHBoxLayout(grp_bud)
@@ -726,25 +740,20 @@ class FormulaireTab(QWidget):
             vl.addWidget(widget)
             hl2.addLayout(vl)
 
-        vl_tp = QVBoxLayout()
-        vl_tp.addWidget(QLabel("Total PV"))
-        vl_tp.addWidget(self._total_pv_lbl)
-        hl2.addLayout(vl_tp)
-
-        vl_ea = QVBoxLayout()
-        vl_ea.addWidget(QLabel("Total facturé (EA)"))
-        vl_ea.addWidget(self._total_ea_lbl)
-        hl2.addLayout(vl_ea)
+        for lbl_text, lbl_w in [("Total PV", self._total_pv_lbl), ("Total facturé (EA)", self._total_ea_lbl)]:
+            vl = QVBoxLayout()
+            vl.addWidget(QLabel(lbl_text))
+            vl.addWidget(lbl_w)
+            hl2.addLayout(vl)
         hl2.addStretch()
 
         self._montant_base.valueChanged.connect(self._update_calculs)
         self._montant_decomptes.valueChanged.connect(self._update_calculs)
-
         self._vl.addWidget(grp_bud)
 
-        # PR + Marges
+        # ── PR + Marge devis ──────────────────────────────────────────────
         grp_pr = QGroupBox()
-        grp_pr.setTitle("Prix de Revient & Marges")
+        grp_pr.setTitle("Prix de Revient & Marge devis")
         hl3 = QHBoxLayout(grp_pr)
 
         self._prix_de_revient = QDoubleSpinBox()
@@ -757,16 +766,10 @@ class FormulaireTab(QWidget):
         self._marge_devis.setSingleStep(0.1)
         self._marge_devis.setDecimals(2)
         self._marge_devis.setSuffix(" %")
-        self._marge_finale = QDoubleSpinBox()
-        self._marge_finale.setRange(-100, 100)
-        self._marge_finale.setSingleStep(0.1)
-        self._marge_finale.setDecimals(2)
-        self._marge_finale.setSuffix(" %")
 
         for lbl_text, widget in [
             ("PR Soumission (€ HTVA)", self._prix_de_revient),
             ("Marge devis (%)", self._marge_devis),
-            ("Marge finale d'exécution (%)", self._marge_finale),
         ]:
             vl = QVBoxLayout()
             vl.addWidget(QLabel(lbl_text))
@@ -775,48 +778,17 @@ class FormulaireTab(QWidget):
         hl3.addStretch()
         self._vl.addWidget(grp_pr)
 
-        # RP
-        grp_rp = QGroupBox()
-        grp_rp.setTitle("Retenues (RP)")
-        hl4 = QHBoxLayout(grp_rp)
-        self._rp_demandee = QLineEdit()
-        self._rp_demandee.setPlaceholderText("RP demandée")
-        self._rp_realisee = QLineEdit()
-        self._rp_realisee.setPlaceholderText("RP réalisée")
-        self._rp_statut = QLineEdit()
-        self._rp_statut.setPlaceholderText("Statut RP")
-        for lbl_text, widget in [
-            ("RP demandée", self._rp_demandee),
-            ("RP réalisée", self._rp_realisee),
-            ("Statut RP", self._rp_statut),
-        ]:
-            vl = QVBoxLayout()
-            vl.addWidget(QLabel(lbl_text))
-            vl.addWidget(widget)
-            hl4.addLayout(vl)
-        hl4.addStretch()
-        self._vl.addWidget(grp_rp)
-
     def _update_calculs(self):
         dc = self._delai_contractuel.value()
         dcomp = self._delai_complementaire.value()
-        dr = self._delai_reel.value()
-        ds = self._delai_soumission.value()
         unite = self._unite_delai.currentText()
+        delai_total = dc + dcomp
 
-        if dc and dr:
-            respect = (dc + dcomp) - dr
-            sign = "+" if respect >= 0 else ""
-            color = "green" if respect >= 0 else "#c0392b"
-            self._respect_lbl.setText(f"Respect délai : {sign}{respect} {unite}")
-            self._respect_lbl.setStyleSheet(f"color:{color}; padding:0 10px;")
-        else:
-            self._respect_lbl.setText("")
+        self._delai_reel.setText(f"{delai_total} {unite}" if delai_total else "—")
 
         ch = self._chantier_info or {}
         oc_raw = ch.get("ordre_commencer", "")
-        delai_base = dc if dc > 0 else (ds if ds > 0 else None)
-        if oc_raw and delai_base is not None:
+        if oc_raw and delai_total:
             start = None
             for fmt in _DATE_FORMATS:
                 try:
@@ -825,18 +797,17 @@ class FormulaireTab(QWidget):
                 except Exception:
                     pass
             if start:
-                total = delai_base + dcomp
                 if unite == "JC":
-                    end = start + timedelta(days=total)
+                    end = start + timedelta(days=delai_total)
                 elif unite == "JO":
-                    end = start + timedelta(days=int(total * 7 / 5))
+                    end = start + timedelta(days=int(delai_total * 7 / 5))
                 elif unite == "semaines":
-                    end = start + timedelta(weeks=total)
+                    end = start + timedelta(weeks=delai_total)
                 else:
-                    end = start + timedelta(days=total * 30)
+                    end = start + timedelta(days=delai_total * 30)
                 self._date_fin_lbl.setText(
-                    f"OC: {oc_raw}  →  Date fin théorique : {end.strftime('%d/%m/%Y')} "
-                    f"({delai_base}+{dcomp} {unite})"
+                    f"OC : {oc_raw}  →  Date fin théorique : {end.strftime('%d/%m/%Y')} "
+                    f"({dc}+{dcomp} {unite})"
                 )
                 self._date_fin_lbl.setStyleSheet(
                     "color:#27ae60; font-weight:bold; padding:2px 6px;"
@@ -846,10 +817,96 @@ class FormulaireTab(QWidget):
         else:
             self._date_fin_lbl.setText("")
 
+        self._update_rp_compare(delai_total, unite)
+
         mb = self._montant_base.value()
         md = self._montant_decomptes.value()
         self._total_pv_lbl.setText(_fmt_eur(mb + md))
         self._total_ea_lbl.setText(_fmt_eur(self._montant_facture))
+
+    def _update_rp_compare(self, delai_total: int, unite: str) -> None:
+        ch = self._chantier_info or {}
+        oc_raw = ch.get("ordre_commencer", "")
+        if not oc_raw:
+            self._rp_compare_widget.setVisible(False)
+            return
+
+        oc_date = None
+        for fmt in _DATE_FORMATS:
+            try:
+                oc_date = datetime.strptime(oc_raw.strip(), fmt).date()
+                break
+            except Exception:
+                pass
+        if not oc_date:
+            self._rp_compare_widget.setVisible(False)
+            return
+
+        self._lbl_oc.setText(f"Ordre de commencer\n{oc_raw}")
+
+        rp_dem_raw = ch.get("rp_demandee", "") or ""
+        rp_real_raw = ch.get("rp_realisee", "") or ""
+
+        rp_dem_date = None
+        if rp_dem_raw:
+            for fmt in _DATE_FORMATS:
+                try:
+                    rp_dem_date = datetime.strptime(rp_dem_raw.strip(), fmt).date()
+                    break
+                except Exception:
+                    pass
+
+        rp_real_date = None
+        if rp_real_raw:
+            for fmt in _DATE_FORMATS:
+                try:
+                    rp_real_date = datetime.strptime(rp_real_raw.strip(), fmt).date()
+                    break
+                except Exception:
+                    pass
+
+        self._lbl_rp_dem.setText(f"RP demandée\n{rp_dem_raw if rp_dem_raw else '—'}")
+        self._lbl_rp_real.setText(f"RP réalisée\n{rp_real_raw if rp_real_raw else '—'}")
+
+        rp_ref_date = rp_real_date or rp_dem_date
+        rp_ref_label = "réalisée" if rp_real_date else ("demandée" if rp_dem_date else None)
+
+        _card_base = "padding:6px 10px; border-radius:4px; min-width:130px;"
+        if rp_ref_date and delai_total:
+            days_jc = (rp_ref_date - oc_date).days
+            if unite == "JO":
+                days_u = round(days_jc * 5 / 7)
+            elif unite == "semaines":
+                days_u = round(days_jc / 7)
+            elif unite == "mois":
+                days_u = round(days_jc / 30)
+            else:
+                days_u = days_jc
+
+            ecart = days_u - delai_total
+            sign = "+" if ecart > 0 else ""
+            if ecart > 0:
+                color, verdict = "#c0392b", "DÉPASSEMENT"
+            elif ecart < 0:
+                color, verdict = "#27ae60", "AVANCE"
+            else:
+                color, verdict = "#1a3a5c", "RESPECTÉ"
+
+            self._lbl_rp_ecart.setText(
+                f"OC → RP ({rp_ref_label})\n{days_u} {unite}\n{verdict} : {sign}{ecart} {unite}"
+            )
+            self._lbl_rp_ecart.setStyleSheet(
+                f"background:#edf1f7; color:{color}; font-weight:bold; {_card_base}"
+            )
+        else:
+            msg = "Comparaison RP\n"
+            msg += "(dates RP non disponibles)" if not rp_ref_date else "(délai non saisi)"
+            self._lbl_rp_ecart.setText(msg)
+            self._lbl_rp_ecart.setStyleSheet(
+                f"background:#edf1f7; color:#8a96a3; {_card_base}"
+            )
+
+        self._rp_compare_widget.setVisible(True)
 
     # ── Section 4 : Rendements ─────────────────────────────────────────────
     def _build_section4(self):
@@ -1011,19 +1068,16 @@ class FormulaireTab(QWidget):
             "id_chantier": self._id_chantier.text().strip(),
             "date_bilan": self._date_bilan.text().strip()
             or date.today().strftime("%d/%m/%Y"),
-            "delai_soumission": self._delai_soumission.value() or None,
+            "delai_soumission": self._delai_contractuel.value() or None,
             "delai_contractuel": self._delai_contractuel.value() or None,
             "delai_complementaire": self._delai_complementaire.value() or None,
-            "delai_reel": self._delai_reel.value() or None,
+            "delai_reel": (self._delai_contractuel.value() + self._delai_complementaire.value()) or None,
             "unite_delai": self._unite_delai.currentText(),
             "montant_base_pv": self._montant_base.value() or None,
             "montant_decomptes_pv": self._montant_decomptes.value() or None,
             "prix_de_revient": self._prix_de_revient.value() or None,
             "marge_devis": self._marge_devis.value() or None,
-            "marge_finale": self._marge_finale.value() or None,
-            "rp_demandee": self._rp_demandee.text() or None,
-            "rp_realisee": self._rp_realisee.text() or None,
-            "rp_statut": self._rp_statut.text() or None,
+            "marge_finale": None,
             "niveau_qualite": self._niveau_qualite.toPlainText() or None,
             "satisfaction_client": self._satisfaction_client.value(),
             "travaux_non_satisfaisants": self._travaux_non_sat.toPlainText() or None,
@@ -1108,24 +1162,18 @@ class FormulaireTab(QWidget):
         self._montant_facture = 0.0
         self._id_chantier.setText("")
         self._date_bilan.setText(date.today().strftime("%d/%m/%Y"))
-        for spin in (
-            self._delai_soumission,
-            self._delai_contractuel,
-            self._delai_complementaire,
-            self._delai_reel,
-        ):
+        for spin in (self._delai_contractuel, self._delai_complementaire):
             spin.setValue(0)
+        self._delai_reel.setText("—")
         self._unite_delai.setCurrentText("JC")
         for s in (
             self._montant_base,
             self._montant_decomptes,
             self._prix_de_revient,
             self._marge_devis,
-            self._marge_finale,
         ):
             s.setValue(0.0)
-        for w in (self._rp_demandee, self._rp_realisee, self._rp_statut):
-            w.setText("")
+        self._rp_compare_widget.setVisible(False)
         for w in (
             self._pp_client_nom,
             self._pp_client_rel,
@@ -1171,10 +1219,8 @@ class FormulaireTab(QWidget):
         self._date_bilan.setText(
             bilan.get("date_bilan") or date.today().strftime("%d/%m/%Y")
         )
-        self._delai_soumission.setValue(bilan.get("delai_soumission") or 0)
         self._delai_contractuel.setValue(bilan.get("delai_contractuel") or 0)
         self._delai_complementaire.setValue(bilan.get("delai_complementaire") or 0)
-        self._delai_reel.setValue(bilan.get("delai_reel") or 0)
         idx = self._unite_delai.findText(bilan.get("unite_delai") or "JC")
         if idx >= 0:
             self._unite_delai.setCurrentIndex(idx)
@@ -1182,10 +1228,6 @@ class FormulaireTab(QWidget):
         self._montant_decomptes.setValue(bilan.get("montant_decomptes_pv") or 0.0)
         self._prix_de_revient.setValue(bilan.get("prix_de_revient") or 0.0)
         self._marge_devis.setValue(bilan.get("marge_devis") or 0.0)
-        self._marge_finale.setValue(bilan.get("marge_finale") or 0.0)
-        self._rp_demandee.setText(bilan.get("rp_demandee") or "")
-        self._rp_realisee.setText(bilan.get("rp_realisee") or "")
-        self._rp_statut.setText(bilan.get("rp_statut") or "")
         self._niveau_qualite.setPlainText(bilan.get("niveau_qualite") or "")
         self._satisfaction_client.setValue(bilan.get("satisfaction_client") or 3)
         self._travaux_non_sat.setPlainText(bilan.get("travaux_non_satisfaisants") or "")

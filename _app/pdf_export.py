@@ -307,7 +307,28 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
         )
     )
 
-    # ── 2. Retenues RP & RD ───────────────────────────────────────────────────
+    # ── 2. Parties prenantes ─────────────────────────────────────────────────
+    pp_list = bilan.get("parties_prenantes", [])
+    if pp_list:
+        story += _section_header(2, "Parties Prenantes")
+        header = [
+            Paragraph(h, STYLES["th"])
+            for h in ["Rôle", "Nom", "Relation", "Évaluation"]
+        ]
+        rows = []
+        for pp in pp_list:
+            rows.append(
+                [
+                    Paragraph(_val(pp.get("role")), STYLES["value"]),
+                    Paragraph(_val(pp.get("nom")), STYLES["value"]),
+                    Paragraph(_val(pp.get("relation")), STYLES["value"]),
+                    Paragraph(_stars(pp.get("evaluation")), STYLES["value"]),
+                ]
+            )
+        cw = [CONTENT_W * 0.18, CONTENT_W * 0.24, CONTENT_W * 0.36, CONTENT_W * 0.22]
+        story.append(_data_table(header, rows, cw))
+
+    # ── 3. Retenues RP & RD ───────────────────────────────────────────────────
     rp_dem = bilan.get("rp_demandee")
     rp_re = bilan.get("rp_realisee")
     rp_st = bilan.get("rp_statut")
@@ -316,7 +337,7 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
     rd_st = bilan.get("rd_statut")
 
     if any([rp_dem, rp_re, rp_st, rd_dem, rd_re, rd_st]):
-        story += _section_header(2, "Retenues RP & RD")
+        story += _section_header(3, "Retenues RP & RD")
         story.append(
             _kv_table(
                 [
@@ -331,8 +352,8 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
             )
         )
 
-    # ── 3. Performance ────────────────────────────────────────────────────────
-    story += _section_header(3, "Performance")
+    # ── 4. Performance ────────────────────────────────────────────────────────
+    story += _section_header(4, "Performance")
 
     ds = bilan.get("delai_soumission")
     dc = bilan.get("delai_contractuel")
@@ -389,7 +410,7 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
     travaux = bilan.get("travaux_internes", [])
 
     if postes_perte or postes_surb or travaux:
-        story += _section_header(4, "Rendements & Exécution")
+        story += _section_header(5, "Rendements & Exécution")
 
         def _postes_tbl(postes, is_loss):
             header = [
@@ -479,8 +500,8 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
             ]
             story.append(_data_table(header, rows, cw, last_row_bold=True))
 
-    # ── 5. Qualité ────────────────────────────────────────────────────────────
-    story += _section_header(5, "Qualité")
+    # ── 6. Qualité ────────────────────────────────────────────────────────────
+    story += _section_header(6, "Qualité")
     story.append(
         _kv_table(
             [
@@ -492,8 +513,8 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
         )
     )
 
-    # ── 6. Sécurité ───────────────────────────────────────────────────────────
-    story += _section_header(6, "Sécurité")
+    # ── 7. Sécurité ───────────────────────────────────────────────────────────
+    story += _section_header(7, "Sécurité")
     story.append(
         _kv_table(
             [
@@ -503,27 +524,6 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
             ]
         )
     )
-
-    # ── 7. Parties prenantes ──────────────────────────────────────────────────
-    pp_list = bilan.get("parties_prenantes", [])
-    if pp_list:
-        story += _section_header(7, "Parties Prenantes")
-        header = [
-            Paragraph(h, STYLES["th"])
-            for h in ["Rôle", "Nom", "Relation", "Évaluation"]
-        ]
-        rows = []
-        for pp in pp_list:
-            rows.append(
-                [
-                    Paragraph(_val(pp.get("role")), STYLES["value"]),
-                    Paragraph(_val(pp.get("nom")), STYLES["value"]),
-                    Paragraph(_val(pp.get("relation")), STYLES["value"]),
-                    Paragraph(_stars(pp.get("evaluation")), STYLES["value"]),
-                ]
-            )
-        cw = [CONTENT_W * 0.18, CONTENT_W * 0.24, CONTENT_W * 0.36, CONTENT_W * 0.22]
-        story.append(_data_table(header, rows, cw))
 
     # ── 8. Sous-traitants ─────────────────────────────────────────────────────
     sts = bilan.get("sous_traitants", [])

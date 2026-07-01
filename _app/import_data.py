@@ -228,6 +228,7 @@ def import_chantiers(
                 _num(g(row, "pr")),
             ),
         )
+        existing_ids.add(id_c)
         imported += 1
 
     conn.commit()
