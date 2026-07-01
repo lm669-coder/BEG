@@ -380,8 +380,8 @@ def import_ea(
     _EA_MONTANT_FALLBACK_COL = 21  # colonne V dans le format EA BEG standard
     if col_montant is None:
         col_montant = (
-            _find_col(headers_norm, "revision", "facture", "montant facture")
-            or _find_col(headers_norm, "montant")
+            _find_col(headers_norm, "montant facture y compris revision", "montant facture revision")
+            or _find_col(headers_norm, "montant facture")
             or _EA_MONTANT_FALLBACK_COL
         )
 
