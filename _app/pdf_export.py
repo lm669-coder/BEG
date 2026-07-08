@@ -358,9 +358,14 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
     ds = bilan.get("delai_soumission")
     dc = bilan.get("delai_contractuel")
     dcomp = bilan.get("delai_complementaire") or 0
+    dhors = bilan.get("delai_comp_hors_decomptes") or 0
     dr = bilan.get("delai_reel")
     unite = bilan.get("unite_delai", "JC")
-    respect = ((dc or 0) + dcomp - dr) if (dc is not None and dr is not None) else None
+    respect = (
+        ((dc or 0) + dcomp + dhors - dr)
+        if (dc is not None and dr is not None)
+        else None
+    )
 
     story.append(Paragraph("Délais", STYLES["subsec"]))
     story.append(
@@ -368,7 +373,8 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
             [
                 ("Délai soumission", f"{ds} {unite}" if ds else "—"),
                 ("Délai contractuel", f"{dc} {unite}" if dc else "—"),
-                ("Délai complémentaire accordé", f"{dcomp} {unite}"),
+                ("Délai complémentaire accordé (décomptes)", f"{dcomp} {unite}"),
+                ("Délai complémentaire hors décomptes", f"{dhors} {unite}"),
                 ("Délai réel d'exécution", f"{dr} {unite}" if dr else "—"),
                 (
                     "Écart (+ = avance / − = retard)",

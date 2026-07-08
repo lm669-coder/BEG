@@ -651,7 +651,8 @@ class FormulaireTab(QWidget):
         hl_d1 = QHBoxLayout()
         for lbl_txt, attr in [
             ("Délai contractuel", "_delai_contractuel"),
-            ("Délai complémentaire", "_delai_complementaire"),
+            ("Délai complémentaire (décomptes)", "_delai_complementaire"),
+            ("Délai compl. hors décomptes", "_delai_comp_hors_dec"),
         ]:
             spin = QSpinBox()
             spin.setRange(0, 9999)
@@ -709,7 +710,11 @@ class FormulaireTab(QWidget):
         self._rp_compare_widget.setVisible(False)
         vl_d.addWidget(self._rp_compare_widget)
 
-        for s in (self._delai_contractuel, self._delai_complementaire):
+        for s in (
+            self._delai_contractuel,
+            self._delai_complementaire,
+            self._delai_comp_hors_dec,
+        ):
             s.valueChanged.connect(self._update_calculs)
         self._unite_delai.currentTextChanged.connect(self._update_calculs)
         self._vl.addWidget(grp_delai)
@@ -821,8 +826,9 @@ class FormulaireTab(QWidget):
     def _update_calculs(self):
         dc = self._delai_contractuel.value()
         dcomp = self._delai_complementaire.value()
+        dhors = self._delai_comp_hors_dec.value()
         unite = self._unite_delai.currentText()
-        delai_total = dc + dcomp
+        delai_total = dc + dcomp + dhors
 
         self._delai_reel.setText(f"{delai_total} {unite}" if delai_total else "—")
 
@@ -847,7 +853,7 @@ class FormulaireTab(QWidget):
                     end = start + timedelta(days=delai_total * 30)
                 self._date_fin_lbl.setText(
                     f"OC : {oc_raw}  →  Date fin théorique : {end.strftime('%d/%m/%Y')} "
-                    f"({dc}+{dcomp} {unite})"
+                    f"({dc}+{dcomp}+{dhors} {unite})"
                 )
                 self._date_fin_lbl.setStyleSheet(
                     "color:#27ae60; font-weight:bold; padding:2px 6px;"
@@ -1127,7 +1133,13 @@ class FormulaireTab(QWidget):
             "delai_soumission": self._delai_contractuel.value() or None,
             "delai_contractuel": self._delai_contractuel.value() or None,
             "delai_complementaire": self._delai_complementaire.value() or None,
-            "delai_reel": (self._delai_contractuel.value() + self._delai_complementaire.value()) or None,
+            "delai_comp_hors_decomptes": self._delai_comp_hors_dec.value() or None,
+            "delai_reel": (
+                self._delai_contractuel.value()
+                + self._delai_complementaire.value()
+                + self._delai_comp_hors_dec.value()
+            )
+            or None,
             "unite_delai": self._unite_delai.currentText(),
             "montant_base_pv": self._montant_base.value() or None,
             "montant_decomptes_pv": self._montant_decomptes.value() or None,
@@ -1222,7 +1234,11 @@ class FormulaireTab(QWidget):
         self._montant_facture = 0.0
         self._id_chantier.setText("")
         self._date_bilan.setText(date.today().strftime("%d/%m/%Y"))
-        for spin in (self._delai_contractuel, self._delai_complementaire):
+        for spin in (
+            self._delai_contractuel,
+            self._delai_complementaire,
+            self._delai_comp_hors_dec,
+        ):
             spin.setValue(0)
         self._delai_reel.setText("—")
         self._unite_delai.setCurrentText("JC")
@@ -1283,6 +1299,7 @@ class FormulaireTab(QWidget):
         )
         self._delai_contractuel.setValue(bilan.get("delai_contractuel") or 0)
         self._delai_complementaire.setValue(bilan.get("delai_complementaire") or 0)
+        self._delai_comp_hors_dec.setValue(bilan.get("delai_comp_hors_decomptes") or 0)
         idx = self._unite_delai.findText(bilan.get("unite_delai") or "JC")
         if idx >= 0:
             self._unite_delai.setCurrentIndex(idx)
