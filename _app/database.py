@@ -185,6 +185,8 @@ def init_db() -> None:
             ("bilans", "prix_de_revient", "REAL"),
             ("chantiers", "prix_de_revient", "REAL"),
             ("decomptes", "statut_accepte", "INTEGER"),
+            ("bilans", "montant_facture_ea", "REAL"),
+            ("bilans", "cout_execution", "REAL"),
         ]:
             try:
                 c.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}")
@@ -308,6 +310,8 @@ def save_bilan(data: dict) -> int:
             data.get("rd_realisee"),
             data.get("rd_statut"),
             data.get("prix_de_revient"),
+            data.get("montant_facture_ea"),
+            data.get("cout_execution"),
         )
 
         if bilan_id:
@@ -322,7 +326,7 @@ def save_bilan(data: dict) -> int:
                 commentaire_general=?, notes_sous_traitants=?,
                 rp_demandee=?, rp_realisee=?, rp_statut=?,
                 rd_a_demander=?, rd_realisee=?, rd_statut=?,
-                prix_de_revient=?,
+                prix_de_revient=?, montant_facture_ea=?, cout_execution=?,
                 updated_at=CURRENT_TIMESTAMP
             WHERE id=?
             """,
@@ -340,8 +344,8 @@ def save_bilan(data: dict) -> int:
                 commentaire_general, notes_sous_traitants,
                 rp_demandee, rp_realisee, rp_statut,
                 rd_a_demander, rd_realisee, rd_statut,
-                prix_de_revient
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                prix_de_revient, montant_facture_ea, cout_execution
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
                 fields,
             )

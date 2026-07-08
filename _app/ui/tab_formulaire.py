@@ -538,6 +538,9 @@ class FormulaireTab(QWidget):
         ch = db.get_chantier(id_c)
         self._chantier_info = ch
         self._montant_facture = db.get_montant_facture(id_c)
+        # Pré-remplit le facturé EA depuis la BDD sauf si déjà saisi manuellement
+        if self._loaded_id is None and not self._montant_facture_ea.value():
+            self._montant_facture_ea.setValue(self._montant_facture)
 
         if ch:
             self._show_chantier_info(ch)
@@ -714,7 +717,9 @@ class FormulaireTab(QWidget):
         # ── Budget ────────────────────────────────────────────────────────
         grp_bud = QGroupBox()
         grp_bud.setTitle("Budget")
-        hl2 = QHBoxLayout(grp_bud)
+        bud_vl = QVBoxLayout(grp_bud)
+        hl2 = QHBoxLayout()
+        bud_vl.addLayout(hl2)
 
         self._montant_base = QDoubleSpinBox()
         self._montant_base.setRange(0, 999_999_999)
@@ -728,8 +733,6 @@ class FormulaireTab(QWidget):
         self._montant_decomptes.setSuffix(" €")
         self._total_pv_lbl = QLabel("0 €")
         self._total_pv_lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
-        self._total_ea_lbl = QLabel("0 €")
-        self._total_ea_lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
 
         for lbl_text, widget in [
             ("Montant base PV (€ HTVA)", self._montant_base),
@@ -740,15 +743,52 @@ class FormulaireTab(QWidget):
             vl.addWidget(widget)
             hl2.addLayout(vl)
 
-        for lbl_text, lbl_w in [("Total PV", self._total_pv_lbl), ("Total facturé (EA)", self._total_ea_lbl)]:
-            vl = QVBoxLayout()
-            vl.addWidget(QLabel(lbl_text))
-            vl.addWidget(lbl_w)
-            hl2.addLayout(vl)
+        vl = QVBoxLayout()
+        vl.addWidget(QLabel("Total PV"))
+        vl.addWidget(self._total_pv_lbl)
+        hl2.addLayout(vl)
         hl2.addStretch()
 
         self._montant_base.valueChanged.connect(self._update_calculs)
         self._montant_decomptes.valueChanged.connect(self._update_calculs)
+
+        # ── Facturé EA / Coût / Marge finale ──────────────────────────────
+        hl2b = QHBoxLayout()
+
+        self._montant_facture_ea = QDoubleSpinBox()
+        self._montant_facture_ea.setRange(0, 999_999_999)
+        self._montant_facture_ea.setSingleStep(1000)
+        self._montant_facture_ea.setDecimals(2)
+        self._montant_facture_ea.setSuffix(" €")
+        self._montant_facture_ea.setToolTip(
+            "Pré-rempli depuis les états d'avancement importés — modifiable manuellement."
+        )
+        self._cout_execution = QDoubleSpinBox()
+        self._cout_execution.setRange(0, 999_999_999)
+        self._cout_execution.setSingleStep(1000)
+        self._cout_execution.setDecimals(2)
+        self._cout_execution.setSuffix(" €")
+        self._marge_finale_lbl = QLabel("—")
+        self._marge_finale_lbl.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
+
+        for lbl_text, widget in [
+            ("Montant total facturé EA (€)", self._montant_facture_ea),
+            ("Coût d'exécution (€)", self._cout_execution),
+        ]:
+            vl = QVBoxLayout()
+            vl.addWidget(QLabel(lbl_text))
+            vl.addWidget(widget)
+            hl2b.addLayout(vl)
+
+        vl = QVBoxLayout()
+        vl.addWidget(QLabel("Marge finale d'exécution"))
+        vl.addWidget(self._marge_finale_lbl)
+        hl2b.addLayout(vl)
+        hl2b.addStretch()
+        bud_vl.addLayout(hl2b)
+
+        self._montant_facture_ea.valueChanged.connect(self._update_calculs)
+        self._cout_execution.valueChanged.connect(self._update_calculs)
         self._vl.addWidget(grp_bud)
 
         # ── PR + Marge devis ──────────────────────────────────────────────
@@ -822,7 +862,23 @@ class FormulaireTab(QWidget):
         mb = self._montant_base.value()
         md = self._montant_decomptes.value()
         self._total_pv_lbl.setText(_fmt_eur(mb + md))
-        self._total_ea_lbl.setText(_fmt_eur(self._montant_facture))
+
+        marge = self._marge_finale()
+        if marge is None:
+            self._marge_finale_lbl.setText("—")
+            self._marge_finale_lbl.setStyleSheet("")
+        else:
+            self._marge_finale_lbl.setText(f"{marge:+.2f} %")
+            color = "#27ae60" if marge >= 0 else "#c0392b"
+            self._marge_finale_lbl.setStyleSheet(f"color:{color};")
+
+    def _marge_finale(self) -> float | None:
+        """Marge finale d'exécution (%) = (facturé − coût) / facturé × 100."""
+        fact = self._montant_facture_ea.value()
+        cout = self._cout_execution.value()
+        if not fact or not cout:
+            return None
+        return round((fact - cout) / fact * 100, 2)
 
     def _update_rp_compare(self, delai_total: int, unite: str) -> None:
         ch = self._chantier_info or {}
@@ -1077,7 +1133,9 @@ class FormulaireTab(QWidget):
             "montant_decomptes_pv": self._montant_decomptes.value() or None,
             "prix_de_revient": self._prix_de_revient.value() or None,
             "marge_devis": self._marge_devis.value() or None,
-            "marge_finale": None,
+            "montant_facture_ea": self._montant_facture_ea.value() or None,
+            "cout_execution": self._cout_execution.value() or None,
+            "marge_finale": self._marge_finale(),
             "niveau_qualite": self._niveau_qualite.toPlainText() or None,
             "satisfaction_client": self._satisfaction_client.value(),
             "travaux_non_satisfaisants": self._travaux_non_sat.toPlainText() or None,
@@ -1122,7 +1180,9 @@ class FormulaireTab(QWidget):
             "secteur": "",
             "province": "",
         }
-        pdf_bytes = pdf_export.generate_pdf(data, ch, self._montant_facture)
+        pdf_bytes = pdf_export.generate_pdf(
+            data, ch, self._montant_facture_ea.value() or self._montant_facture
+        )
         fname = f"Bilan_{id_c}_{date.today().strftime('%Y%m%d')}.pdf"
         default_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "PDFs"
@@ -1171,6 +1231,8 @@ class FormulaireTab(QWidget):
             self._montant_decomptes,
             self._prix_de_revient,
             self._marge_devis,
+            self._montant_facture_ea,
+            self._cout_execution,
         ):
             s.setValue(0.0)
         self._rp_compare_widget.setVisible(False)
@@ -1278,6 +1340,11 @@ class FormulaireTab(QWidget):
 
         self._chantier_info = db.get_chantier(str(bilan["id_chantier"]))
         self._montant_facture = db.get_montant_facture(str(bilan["id_chantier"]))
+        # Valeur enregistrée prioritaire, sinon total EA de la BDD
+        self._montant_facture_ea.setValue(
+            bilan.get("montant_facture_ea") or self._montant_facture or 0.0
+        )
+        self._cout_execution.setValue(bilan.get("cout_execution") or 0.0)
         if self._chantier_info:
             self._show_chantier_info(self._chantier_info)
 

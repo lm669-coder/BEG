@@ -387,6 +387,7 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
     pct_dec = (md / mb * 100) if mb else None
     mg_devis = bilan.get("marge_devis")
     mg_finale = bilan.get("marge_finale")
+    cout_exec = bilan.get("cout_execution")
 
     story.append(Paragraph("Budget & Marges", STYLES["subsec"]))
     story.append(
@@ -398,6 +399,7 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
                 ("Total PV (base + décomptes)", _euro(total_pv)),
                 ("Prix de revient soumission", _euro(pr)),
                 ("Montant total facturé (EA)", _euro(montant_facture)),
+                ("Coût d'exécution", _euro(cout_exec)),
                 ("Marge devis", _pct(mg_devis)),
                 ("Marge finale d'exécution", _pct(mg_finale)),
             ]
