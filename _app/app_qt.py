@@ -401,12 +401,45 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName(APP_TITLE)
     _apply_palette(app)
+    import paths
+
+    # Base configurée (dossier SharePoint) introuvable : ne JAMAIS en créer une
+    # vide en local, les données divergeraient silencieusement d'un poste à l'autre.
+    if paths.DB_DIR_EXPLICIT and not os.path.isfile(db.DB_PATH):
+        from PyQt6.QtWidgets import QMessageBox
+
+        QMessageBox.critical(
+            None,
+            APP_TITLE,
+            "Base de données introuvable :\n\n" + db.DB_PATH + "\n\n"
+            "Vérifiez que le dossier SharePoint « 38. Bilan d'expérience » est bien "
+            "synchronisé avec OneDrive (icône nuage / coche verte), puis relancez.",
+        )
+        sys.exit(1)
     splash = _splash()
     splash.show()
     app.processEvents()
     win = MainWindow()
     win.show()
     splash.finish(win)
+    db.backup_if_due()
+    conflits = db.conflict_copies()
+    if conflits:
+        from PyQt6.QtCore import QTimer
+        from PyQt6.QtWidgets import QMessageBox
+
+        QTimer.singleShot(
+            300,
+            lambda: QMessageBox.warning(
+                win,
+                "Copies en conflit détectées",
+                "SharePoint a créé des copies de la base après des enregistrements "
+                "simultanés : des données ont pu être perdues.\n\n"
+                + "\n".join(conflits[:8])
+                + "\n\nPrévenez l'administrateur avant de continuer. Des sauvegardes "
+                "quotidiennes se trouvent dans le dossier « backups ».",
+            ),
+        )
     sys.exit(app.exec())
 
 

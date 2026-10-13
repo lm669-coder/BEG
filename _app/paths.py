@@ -31,7 +31,7 @@ def _cfg(key: str, env: str) -> str:
     if not val:
         ini = os.path.join(EXE_DIR, "beg_config.ini")
         if os.path.isfile(ini):
-            cp = configparser.ConfigParser()
+            cp = configparser.ConfigParser(interpolation=None)  # le "%" de %USERPROFILE% n'est pas une interpolation
             try:
                 cp.read(ini, encoding="utf-8")
                 val = cp.get("beg", key, fallback="").strip()
@@ -43,8 +43,10 @@ def _cfg(key: str, env: str) -> str:
 # Photos et instantané EMAsphere (fichiers entiers : un dossier synchronisé,
 # p. ex. SharePoint/OneDrive, convient).
 DATA_DIR = _cfg("data_dir", "BEG_DATA_DIR") or EXE_DIR
-# Base SQLite : doit rester sur un VRAI disque partagé (jamais un dossier
-# synchronisé OneDrive/SharePoint : conflits et corruption à plusieurs postes).
+# Base SQLite. Sur un dossier synchronisé (OneDrive/SharePoint), des enregistrements
+# SIMULTANÉS de plusieurs postes peuvent créer des copies en conflit : l'application
+# fait des sauvegardes quotidiennes (backups/) et signale ces copies (database.py).
+DB_DIR_EXPLICIT = bool(_cfg("db_dir", "BEG_DB_DIR"))  # configurée => ne jamais créer une base vide
 DB_DIR = _cfg("db_dir", "BEG_DB_DIR") or DATA_DIR
 
 CACHE_DIR = os.path.join(

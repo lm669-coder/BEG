@@ -1,5 +1,8 @@
-import sqlite3
+import datetime
+import glob
 import os
+import sqlite3
+import time
 
 import paths
 
@@ -20,14 +23,79 @@ _BILAN_CHILD_TABLES = (
 
 def get_conn(write: bool = False) -> sqlite3.Connection:
     """Connexion SQLite. `write=True` prend le verrou d'écriture d'emblée
-    (BEGIN IMMEDIATE) : pas d'interblocage entre deux postes sur le partage réseau.
-    Pas de mode WAL : il est interdit sur un partage réseau."""
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    if write:
-        conn.execute("BEGIN IMMEDIATE")
-    return conn
+    (BEGIN IMMEDIATE) : pas d'interblocage entre deux postes sur le partage.
+    Pas de mode WAL (interdit sur partage réseau / dossier synchronisé).
+    Quelques reprises : OneDrive peut verrouiller le fichier pendant sa synchro."""
+    last: Exception | None = None
+    for attempt in range(5):
+        conn = None
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=10)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            if write:
+                conn.execute("BEGIN IMMEDIATE")
+            return conn
+        except sqlite3.OperationalError as e:
+            last = e
+            if conn is not None:
+                conn.close()
+            time.sleep(0.4 * (attempt + 1))
+    raise last  # type: ignore[misc]
+
+
+BACKUP_DAYS = 14
+
+
+def backup_if_due(days: int = BACKUP_DAYS) -> str | None:
+    """Sauvegarde quotidienne par utilisateur dans <dossier base>/backups (API de
+    sauvegarde SQLite = copie cohérente). Filet de sécurité contre une corruption ou
+    une copie en conflit de la synchronisation. Garde `days` jours."""
+    if not os.path.exists(DB_PATH):
+        return None
+    bdir = os.path.join(os.path.dirname(DB_PATH), "backups")
+    user = "".join(c for c in os.environ.get("USERNAME", "user") if c.isalnum()) or "user"
+    today = datetime.date.today()
+    target = os.path.join(bdir, f"BEG_Data_{today:%Y%m%d}_{user}.db")
+    if os.path.exists(target):
+        return None
+    try:
+        os.makedirs(bdir, exist_ok=True)
+        src = sqlite3.connect(DB_PATH, timeout=10)
+        dst = sqlite3.connect(target)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+        limite = f"{today - datetime.timedelta(days=days):%Y%m%d}"
+        for f in glob.glob(os.path.join(bdir, "BEG_Data_*.db")):
+            stamp = os.path.basename(f)[len("BEG_Data_"):][:8]
+            if stamp.isdigit() and stamp < limite:
+                os.remove(f)
+        return target
+    except (OSError, sqlite3.Error):
+        return None
+
+
+def conflict_copies() -> list[str]:
+    """Copies en conflit créées par OneDrive/SharePoint à côté de la base
+    (ex. « BEG_Data-PC-LUCA.db », « BEG_Data (1).db ») : des écritures simultanées
+    ont eu lieu et des données ont pu être perdues."""
+    folder = os.path.dirname(DB_PATH)
+    base = os.path.splitext(os.path.basename(DB_PATH))[0]
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return []
+    return sorted(
+        n
+        for n in names
+        if n.lower().endswith(".db")
+        and n != os.path.basename(DB_PATH)
+        and n.startswith(base)
+        and n[len(base) : len(base) + 1] in ("-", "_", " ", "(")
+    )
 
 
 def init_db() -> None:
