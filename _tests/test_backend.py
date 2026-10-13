@@ -14,7 +14,7 @@ from datetime import datetime
 import pytest
 
 # ── Path ─────────────────────────────────────────────────────────────────────
-sys.path.insert(0, r"P:\BEG_RMI\_app")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "_app"))
 
 import database as db
 import import_data as imp
@@ -795,13 +795,13 @@ class TestStars:
         assert "★★★★★" in result
         assert "5/5" in result
 
-    def test_zero_stars(self):
-        result = pdf._stars(0)
-        assert "0/5" in result
+    def test_zero_means_not_evaluated(self):
+        # 0 = « non évalué » : affiché comme un tiret (exclu des moyennes)
+        assert pdf._stars(0) == "—"
 
     def test_correct_total_length(self):
         # 5 étoiles/points + texte
-        for n in range(6):
+        for n in range(1, 6):
             result = pdf._stars(n)
             stars = result.count("★")
             dots = result.count("·")

@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QFileDialog,
     QFrame,
+    QApplication,
     QDialog,
     QCheckBox,
     QDialogButtonBox,
@@ -418,24 +419,34 @@ class STSection(DynamicSection):
 class DucDialog(QDialog):
     """Aperçu de la DUC : choix des sous-traitants à importer."""
 
-    def __init__(self, duc: dict, parent=None):
+    def __init__(self, duc: dict, interp: dict, client_actuel: str = "", parent=None):
         super().__init__(parent)
         self.setWindowTitle("Import depuis la DUC")
-        self.resize(560, 520)
+        self.resize(560, 560)
         vl = QVBoxLayout(self)
 
-        mo_c, mo_x = duc["mo_conception"], duc["mo_controle"]
-        lignes = [f"Maître d'oeuvre (conception) : {mo_c or '—'}"]
-        if mo_x and mo_x != mo_c:
-            lignes.append(f"Maître d'oeuvre (contrôle exécution) : {mo_x}")
-        coord = duc["coord_realisation"] or duc["coord_elaboration"]
-        lignes.append(f"Coordinateur sécurité : {coord or '—'}")
-        lbl = QLabel("\n".join(lignes))
+        # Le donneur d'ordre / maître d'oeuvre public EST le client : il remplace le
+        # Client ; « Architecte » n'est rempli que par un maître d'oeuvre distinct.
+        self._chk_client = QCheckBox("")
+        if interp["client"]:
+            ancien = f" (actuellement : « {client_actuel} »)" if client_actuel else ""
+            self._chk_client.setText(
+                f"Client = donneur d'ordre / maître d'ouvrage : « {interp['client']} »{ancien}"
+            )
+            self._chk_client.setChecked(True)
+        else:
+            self._chk_client.setText("Donneur d'ordre : non renseigné dans la DUC")
+            self._chk_client.setEnabled(False)
+        vl.addWidget(self._chk_client)
+
+        archi = interp["architecte"] or f"— ({interp['note_architecte']})"
+        coord = interp["coordinateur"] or "—"
+        lbl = QLabel(f"Architecte (maître d'oeuvre) : {archi}\nCoordinateur sécurité : {coord}")
         lbl.setWordWrap(True)
         vl.addWidget(lbl)
 
-        self._chk_arch = QCheckBox("Importer l'architecte / maître d'oeuvre et le coordinateur")
-        self._chk_arch.setChecked(True)
+        self._chk_arch = QCheckBox("Importer l'architecte et le coordinateur sécurité")
+        self._chk_arch.setChecked(bool(interp["architecte"] or interp["coordinateur"]))
         vl.addWidget(self._chk_arch)
 
         sts = duc["sous_traitants"]
@@ -462,6 +473,9 @@ class DucDialog(QDialog):
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
         vl.addWidget(bb)
+
+    def import_client(self) -> bool:
+        return self._chk_client.isChecked()
 
     def import_architecte(self) -> bool:
         return self._chk_arch.isChecked()
@@ -597,7 +611,19 @@ class FormulaireTab(QWidget):
     def _on_id_changed(self):
         self._lookup_timer.start()
 
+    def _sync_photos(self):
+        """L'onglet Photos suit l'ID saisi ; vide si pas d'ID / nouveau bilan vierge."""
+        ph = getattr(self._main, "tab_photos", None)
+        if ph is not None:
+            ph.set_chantier(self._id_chantier.text())
+
     def _do_lookup(self):
+        try:
+            self._do_lookup_impl()
+        finally:
+            self._sync_photos()
+
+    def _do_lookup_impl(self):
         id_c = self._id_chantier.text().strip()
         if not id_c:
             self._chantier_info = None
@@ -765,30 +791,51 @@ class FormulaireTab(QWidget):
     def _import_duc(self):
         id_c = self._id_chantier.text().strip()
         ch = self._chantier_info or {}
-        path = duc_parser.find_duc(id_c, ch.get("departement")) if id_c else None
-        if not path:
+        candidats = (
+            duc_parser.find_duc_all(id_c, ch.get("departement")) if id_c else []
+        )
+        duc, message = None, ""
+        if candidats:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            try:
+                duc, message = duc_parser.parse_best(candidats)
+            finally:
+                QApplication.restoreOverrideCursor()
+        if duc is None:
+            if message:
+                QMessageBox.information(
+                    self, "DUC", message + "\nChoisissez manuellement un autre PDF."
+                )
             path, _ = QFileDialog.getOpenFileName(
                 self, "Choisir la DUC (PDF)", "", "PDF (*.pdf)"
             )
             if not path:
                 return
-        try:
-            duc = duc_parser.parse_duc(path)
-        except Exception as e:  # PDF illisible, pypdf absent...
-            QMessageBox.warning(self, "DUC", f"Lecture de la DUC impossible :\n{e}")
-            return
+            try:
+                duc = duc_parser.parse_duc(path)
+            except Exception as e:  # PDF illisible, pypdf absent...
+                QMessageBox.warning(self, "DUC", f"Lecture de la DUC impossible :\n{e}")
+                return
+        path = duc["fichier"]
 
-        dlg = DucDialog(duc, self)
+        client_actuel = self._pp_client_nom.text().strip()
+        interp = duc_parser.interpreter(duc, client_actuel)
+        dlg = DucDialog(duc, interp, client_actuel, self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
+        # 1) Client = donneur d'ordre / maître d'ouvrage (remplace la valeur existante)
+        if dlg.import_client() and interp["client"]:
+            self._pp_client_nom.setText(interp["client"])
+        client = self._pp_client_nom.text().strip()
+
+        # 2) Architecte : uniquement un maître d'oeuvre distinct du client
         if dlg.import_architecte():
-            archi = duc["mo_conception"]
-            if duc["mo_controle"] and duc["mo_controle"] != archi:
-                archi = f"{archi} / {duc['mo_controle']} (contrôle)" if archi else duc["mo_controle"]
-            if archi and not self._pp_arch_nom.text().strip():
-                self._pp_arch_nom.setText(archi)
-            coord = duc["coord_realisation"] or duc["coord_elaboration"]
+            actuel = self._pp_arch_nom.text().strip()
+            # Remplace un champ vide ou une ancienne valeur qui n'était que le client
+            if not actuel or (client and duc_parser.meme_entite(actuel, client)):
+                self._pp_arch_nom.setText(interp["architecte"])
+            coord = interp["coordinateur"]
             deja = {d["nom"] for d in self._pp_extra.get_data()}
             if coord and coord not in deja:
                 self._pp_extra.add_row(role="Coordinateur sécurité", nom=coord)
@@ -1039,8 +1086,11 @@ class FormulaireTab(QWidget):
 
         marge = self._marge_finale()
         if marge is None:
-            self._marge_finale_lbl.setText("—")
-            self._marge_finale_lbl.setStyleSheet("")
+            aberrant = bool(
+                self._montant_facture_ea.value() and self._cout_execution.value()
+            )
+            self._marge_finale_lbl.setText("valeur aberrante" if aberrant else "—")
+            self._marge_finale_lbl.setStyleSheet("color:#c0392b;" if aberrant else "")
         else:
             self._marge_finale_lbl.setText(f"{marge:+.2f} %")
             color = "#27ae60" if marge >= 0 else "#c0392b"
@@ -1052,7 +1102,10 @@ class FormulaireTab(QWidget):
         cout = self._cout_execution.value()
         if not fact or not cout:
             return None
-        return round((fact - cout) / fact * 100, 2)
+        marge = round((fact - cout) / fact * 100, 2)
+        # Au-delà de ±1000 %, c'est une erreur de saisie (ex. facturé 0,01 €) : on
+        # ne la stocke pas, elle fausserait les moyennes du Dashboard.
+        return marge if abs(marge) <= 1000 else None
 
     def _update_rp_compare(self, delai_total: int, unite: str) -> None:
         ch = self._chantier_info or {}
@@ -1461,6 +1514,7 @@ class FormulaireTab(QWidget):
         self._info_chantier.setVisible(False)
         self._warn_chantier.setText("")
         self._refresh_combo()
+        self._sync_photos()  # nouveau bilan vierge : l'onglet Photos est réinitialisé
 
     def load_bilan(self, bilan_id: int):
         bilan = db.load_bilan(bilan_id)

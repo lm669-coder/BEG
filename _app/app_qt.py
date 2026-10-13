@@ -1,11 +1,19 @@
+import importlib
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QStatusBar
-from PyQt6.QtCore import QEvent
-from PyQt6.QtGui import QPalette, QColor
+from PyQt6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QSplashScreen,
+    QStatusBar,
+    QTabWidget,
+    QWidget,
+)
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QColor, QFont, QPainter, QPalette, QPixmap
 
 import database as db
 
@@ -167,34 +175,36 @@ def _apply_palette(app: QApplication):
     """)
 
 
+APP_TITLE = "Bilan d'expérience gestionnaire"
+
+
 class MainWindow(QMainWindow):
+    _LAZY_TABS = (
+        ("Historique", "tab_hist", "ui.tab_historique", "HistoriqueTab"),
+        ("Dashboard", "tab_dash", "ui.tab_dashboard", "DashboardTab"),
+        ("Photos", "tab_photos", "ui.tab_photos", "PhotosTab"),
+        ("Importer Excel", "tab_import", "ui.tab_import", "ImportTab"),
+    )
+
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("BEG — Bilan d'expérience")
+        self.setWindowTitle(APP_TITLE)
         self.resize(1280, 860)
 
         db.init_db()
 
         from ui.tab_formulaire import FormulaireTab
-        from ui.tab_historique import HistoriqueTab
-        from ui.tab_dashboard import DashboardTab
-        from ui.tab_import import ImportTab
-        from ui.tab_photos import PhotosTab
 
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
 
+        # Seul le Formulaire est construit au démarrage ; les autres onglets le
+        # sont à leur 1re ouverture (démarrage plus rapide).
         self.tab_form = FormulaireTab(self)
-        self.tab_hist = HistoriqueTab(self)
-        self.tab_dash = DashboardTab(self)
-        self.tab_photos = PhotosTab(self)
-        self.tab_import = ImportTab(self)
-
         self.tabs.addTab(self.tab_form, "Formulaire")
-        self.tabs.addTab(self.tab_hist, "Historique")
-        self.tabs.addTab(self.tab_dash, "Dashboard")
-        self.tabs.addTab(self.tab_photos, "Photos")
-        self.tabs.addTab(self.tab_import, "Importer Excel")
+        self._lazy: dict[int, tuple[str, str, str, str]] = {}
+        for name, attr, mod, cls in self._LAZY_TABS:
+            self._lazy[self.tabs.addTab(QWidget(), name)] = (name, attr, mod, cls)
 
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
@@ -213,14 +223,46 @@ class MainWindow(QMainWindow):
                 paths = _paths_from_mime(ev.mimeData())
                 if paths and _collect(paths):
                     if t == QEvent.Type.Drop:
-                        self.tabs.setCurrentWidget(self.tab_photos)
+                        self.show_tab("Photos")
                         self.tab_photos.refresh()
                         self.tab_photos.import_paths(paths)
                     ev.acceptProposedAction()
                     return True
         return super().eventFilter(obj, ev)
 
+    def _ensure_tab(self, idx: int):
+        """Construit l'onglet `idx` s'il ne l'est pas encore."""
+        spec = self._lazy.pop(idx, None)
+        if not spec:
+            return
+        name, attr, mod, cls = spec
+        widget = getattr(importlib.import_module(mod), cls)(self)
+        setattr(self, attr, widget)
+        placeholder = self.tabs.widget(idx)
+        self.tabs.blockSignals(True)
+        self.tabs.removeTab(idx)
+        self.tabs.insertTab(idx, widget, name)
+        self.tabs.setCurrentIndex(idx)
+        self.tabs.blockSignals(False)
+        placeholder.deleteLater()
+
+    def show_tab(self, name: str):
+        for i in range(self.tabs.count()):
+            if self.tabs.tabText(i) == name:
+                self._ensure_tab(i)
+                self.tabs.setCurrentIndex(i)
+                return
+
+    def closeEvent(self, ev):
+        # Threads de l'onglet Photos (import / miniatures) : arrêt propre, sinon Qt
+        # abandonne l'application à la fermeture d'un QThread encore actif.
+        photos = getattr(self, "tab_photos", None)
+        if photos is not None:
+            photos.shutdown()
+        super().closeEvent(ev)
+
     def _on_tab_changed(self, idx):
+        self._ensure_tab(idx)
         widget = self.tabs.widget(idx)
         if hasattr(widget, "refresh"):
             widget.refresh()
@@ -233,12 +275,138 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(msg, 5000)
 
 
+def _show_error(msg: str):
+    from PyQt6.QtWidgets import QMessageBox
+
+    QMessageBox.warning(None, "Erreur inattendue", msg)
+
+
+def install_excepthook():
+    """PyQt6 ferme l'application sur toute exception non gérée dans un slot :
+    on journalise et on affiche un message, l'application reste ouverte."""
+    import datetime
+    import traceback
+
+    import paths
+
+    def hook(exc_type, exc, tb):
+        txt = "".join(traceback.format_exception(exc_type, exc, tb))
+        log = os.path.join(paths.CACHE_DIR, "erreurs.log")
+        try:
+            os.makedirs(paths.CACHE_DIR, exist_ok=True)
+            with open(log, "a", encoding="utf-8") as f:
+                f.write(f"--- {datetime.datetime.now():%Y-%m-%d %H:%M:%S}\n{txt}\n")
+        except OSError:
+            pass
+        try:
+            _show_error(
+                f"Une erreur est survenue, l'application reste ouverte :\n\n{exc}\n\n"
+                f"Détails : {log}"
+            )
+        except Exception:
+            pass
+
+    sys.excepthook = hook
+
+
+def _splash() -> QSplashScreen:
+    pm = QPixmap(440, 150)
+    pm.fill(QColor("#1a3a5c"))
+    p = QPainter(pm)
+    p.setPen(QColor("white"))
+    p.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
+    p.drawText(pm.rect().adjusted(0, -14, 0, 0), int(Qt.AlignmentFlag.AlignCenter.value), APP_TITLE)
+    p.setFont(QFont("Segoe UI", 10))
+    p.drawText(pm.rect().adjusted(0, 56, 0, 0), int(Qt.AlignmentFlag.AlignCenter.value), "Chargement…")
+    p.end()
+    return QSplashScreen(pm)
+
+
+def _selftest(out_path: str) -> int:
+    """Vérifie, dans l'exe compilé, ressources et imports différés. -> code retour."""
+    import json
+    import traceback
+
+    res: dict = {}
+
+    def check(name, fn):
+        try:
+            res[name] = fn() or "ok"
+        except Exception:
+            res[name] = "ERREUR " + traceback.format_exc(limit=3)
+
+    def _modules():
+        for m in (
+            "ui.tab_historique",
+            "ui.tab_dashboard",
+            "ui.tab_photos",
+            "ui.tab_import",
+            "import_data",
+            "pdf_export",
+            "duc_parser",
+            "emasphere_client",
+            "pypdf",
+            "openpyxl",
+            "PIL",
+        ):
+            importlib.import_module(m)
+
+    def _pdf():
+        import pdf_export
+
+        assert os.path.isfile(pdf_export.LOGO_PATH), "logo absent : " + pdf_export.LOGO_PATH
+        data = {"id_chantier": "T1", "date_bilan": "01/01/2026", "point_significatif": "x"}
+        return f"{len(pdf_export.generate_pdf(data, {'id_chantier': 'T1'}, 0))} octets"
+
+    def _db():
+        db.init_db()
+        return f"{len(db.get_all_chantiers())} chantiers ({db.DB_PATH})"
+
+    def _photos():
+        import tempfile
+
+        from PIL import Image
+        from PyQt6.QtWidgets import QApplication as _QA
+
+        _QA.instance() or _QA([])  # QImage/QImageReader : pas besoin de fenêtre
+        import ui.tab_photos as tp
+
+        tmp = tempfile.mkdtemp(prefix="beg_selftest_")
+        tp.PHOTOS_ROOT = os.path.join(tmp, "Photos")
+        src = os.path.join(tmp, "src.jpg")
+        Image.frombytes("RGB", (900, 700), os.urandom(900 * 700 * 3)).resize(
+            (3600, 2800)
+        ).save(src, "JPEG", quality=92)
+        res = tp.import_photos("T1", [src], reduce=True)
+        out = tp.list_photos("T1")
+        assert res.copied == 1 and res.reduced == 1, f"import/réduction: {res}"
+        assert max(Image.open(out[0]).size) <= tp.MAX_SIDE, "image non réduite"
+        thumb = tp.thumb_path(tp.chantier_dir("T1"), out[0])
+        assert os.path.isfile(thumb), "miniature absente (plugin JPEG Qt ?)"
+        return f"{os.path.getsize(src) // 1024} Ko -> {os.path.getsize(out[0]) // 1024} Ko, miniature OK"
+
+    check("modules", _modules)
+    check("photos (réduction + miniature)", _photos)
+    check("pdf+logo", _pdf)
+    check("base", _db)
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(res, f, ensure_ascii=False, indent=1)
+    return 0 if all(v == "ok" or not v.startswith("ERREUR") for v in res.values()) else 1
+
+
 def main():
+    if len(sys.argv) > 2 and sys.argv[1] == "--selftest":
+        sys.exit(_selftest(sys.argv[2]))
+    install_excepthook()
     app = QApplication(sys.argv)
-    app.setApplicationName("BEG RMI")
+    app.setApplicationName(APP_TITLE)
     _apply_palette(app)
+    splash = _splash()
+    splash.show()
+    app.processEvents()
     win = MainWindow()
     win.show()
+    splash.finish(win)
     sys.exit(app.exec())
 
 

@@ -62,11 +62,15 @@ def est_interim(nom: str) -> bool:
 
 
 # ── Localisation du PDF ───────────────────────────────────────────────────
-def find_duc(id_chantier: str, departement: str | None = None) -> str | None:
-    """Chemin du PDF DUC (version FR) du chantier, ou None."""
+_RE_ANGLAIS = re.compile(r"(^|[_\- ])EN([_. ]|$)", re.IGNORECASE)
+
+
+def find_duc_all(id_chantier: str, departement: str | None = None) -> list[str]:
+    """PDF candidats du dossier DUC du chantier (hors versions anglaises),
+    versions « _FR » d'abord, puis les plus récents."""
     m = re.match(r"\s*(\d+)", id_chantier or "")
     if not m:
-        return None
+        return []
     num = m.group(1)
     d = (departement or "").strip().lower()
     cles = [d] if d in _AFFAIRES else list(_AFFAIRES)
@@ -76,14 +80,51 @@ def find_duc(id_chantier: str, departement: str | None = None) -> str | None:
             base = _SP_ROOT / dept_dir / affaires_dir
             for dossier in glob.glob(glob.escape(str(base)) + os.sep + num + "*"):
                 candidats += glob.glob(os.path.join(dossier, "DUC", "*.pdf"))
-    candidats = [c for c in candidats if "_EN_" not in os.path.basename(c)]
-    if not candidats:
-        return None
-    # Préfère les PDF « _FR », puis le plus récent
+    candidats = [c for c in candidats if not _RE_ANGLAIS.search(os.path.splitext(os.path.basename(c))[0])]
     candidats.sort(
         key=lambda p: ("_FR" in os.path.basename(p), os.path.getmtime(p)), reverse=True
     )
-    return candidats[0]
+    return candidats
+
+
+def find_duc(id_chantier: str, departement: str | None = None) -> str | None:
+    """Premier PDF candidat (voir find_duc_all) ou None."""
+    c = find_duc_all(id_chantier, departement)
+    return c[0] if c else None
+
+
+def _score(duc: dict) -> int:
+    return (
+        10 * len(duc["sous_traitants"])
+        + (3 if duc["mo_conception"] or duc["mo_controle"] else 0)
+        + (1 if duc["coord_realisation"] or duc["coord_elaboration"] else 0)
+    )
+
+
+def parse_best(candidats: list[str]) -> tuple[dict | None, str]:
+    """Lit chaque PDF candidat et garde le plus complet (les dossiers DUC mêlent
+    déclaration complète, résumés Constructiv d'une page, scans...).
+    Retourne (résultat | None, message d'état si rien d'exploitable)."""
+    best, best_score, vides, erreurs = None, 0, 0, 0
+    for path in candidats:
+        try:
+            duc = parse_duc(path)
+        except Exception:
+            erreurs += 1
+            continue
+        if duc["caracteres"] < 50:
+            vides += 1
+            continue
+        sc = _score(duc)
+        if sc > best_score:
+            best, best_score = duc, sc
+    if best:
+        return best, ""
+    if vides:
+        return None, "DUC scannée (image sans texte) : lecture automatique impossible."
+    if erreurs:
+        return None, "DUC illisible (PDF protégé ou endommagé)."
+    return None, "Aucune information exploitable dans les PDF du dossier DUC."
 
 
 # ── Analyse du texte ──────────────────────────────────────────────────────
@@ -99,7 +140,9 @@ def _field(line: str) -> tuple[str, str] | None:
     m = re.match(r"^\s*([^:]{2,40}):\s*(.*)$", line)
     if not m:
         return None
-    return m.group(1).strip(), re.split(r"\s{3,}", m.group(2).strip())[0].strip()
+    val = re.split(r"\s{3,}", m.group(2).strip())[0].strip()
+    # Un « libellé: » (ex. « Boîte: ») n'est pas une valeur : champ vide dans le PDF
+    return m.group(1).strip(), "" if val.endswith(":") else val
 
 
 def _denomination(fields: dict) -> str:
@@ -187,6 +230,7 @@ def parse_duc(path: str) -> dict:
     m = re.search(r"Nom des travaux:\s+(.+)", text)
     return {
         "fichier": path,
+        "caracteres": len(text.strip()),
         "chantier": m.group(1).strip() if m else "",
         "donneur_ordre": nom(_H_DONNEUR),
         "mo_conception": nom(_H_CONCEPTION),
@@ -194,4 +238,75 @@ def parse_duc(path: str) -> dict:
         "coord_elaboration": nom(_H_COORD_ELAB),
         "coord_realisation": nom(_H_COORD_REAL),
         "sous_traitants": _split_sous_traitants(sec.get(_H_ST, [])),
+    }
+
+
+# ── Interprétation : Client / Architecte ──────────────────────────────────
+_STOP = {
+    "ville", "commune", "adm", "administration", "communale", "communal", "cpas",
+    "de", "du", "des", "la", "le", "les", "l", "d", "et", "en", "sa", "sprl", "srl",
+    "asbl", "scrl", "ac", "of",
+}
+
+
+def _tokens(nom: str) -> set[str]:
+    import unicodedata
+
+    n = unicodedata.normalize("NFD", nom or "")
+    n = "".join(c for c in n if unicodedata.category(c) != "Mn").lower()
+    return {t for t in re.split(r"[^a-z0-9]+", n) if t and t not in _STOP}
+
+
+def meme_entite(a: str, b: str) -> bool:
+    """« adm Enghien » et « Ville d'Enghien » désignent la même entité."""
+    ta, tb = _tokens(a), _tokens(b)
+    if not ta or not tb:
+        return False
+    return ta == tb or ta <= tb or tb <= ta
+
+
+def est_mignone(nom: str) -> bool:
+    return "mignone" in re.sub(r"[^a-z]", "", (nom or "").lower())
+
+
+def interpreter(duc: dict, client_actuel: str = "") -> dict:
+    """Répartit les intervenants de la DUC.
+
+    - client      : le donneur d'ordre (maître d'ouvrage) remplace le client existant ;
+    - architecte  : maître d'oeuvre conception / contrôle d'exécution, SEULEMENT s'il
+                    est distinct du client (souvent le maître d'oeuvre est le maître
+                    d'ouvrage lui-même : ce n'est alors pas un architecte) ;
+    - coordinateur: coordinateur sécurité.
+    """
+    donneur = duc.get("donneur_ordre", "")
+    client = "" if est_mignone(donneur) else donneur
+    ref = client or client_actuel
+    distincts: list[str] = []
+    for nom in (duc.get("mo_conception", ""), duc.get("mo_controle", "")):
+        if (
+            nom
+            and not est_mignone(nom)
+            and not (ref and meme_entite(nom, ref))
+            and not any(meme_entite(nom, d) for d in distincts)
+        ):
+            distincts.append(nom)
+    archi = ""
+    if distincts:
+        archi = distincts[0]
+        if len(distincts) > 1:
+            archi = f"{distincts[0]} / {distincts[1]} (contrôle)"
+    note = ""
+    if not archi:
+        mos = [n for n in (duc.get("mo_conception", ""), duc.get("mo_controle", "")) if n]
+        if any(est_mignone(n) for n in mos):
+            note = "le maître d'oeuvre déclaré est Mignone (ignoré)"
+        elif mos:
+            note = "le maître d'oeuvre est le client lui-même"
+        else:
+            note = "maître d'oeuvre non renseigné dans la DUC"
+    return {
+        "client": client,
+        "architecte": archi,
+        "note_architecte": note,
+        "coordinateur": duc.get("coord_realisation") or duc.get("coord_elaboration") or "",
     }

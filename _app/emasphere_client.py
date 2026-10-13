@@ -9,14 +9,10 @@ l'extraction via le MCP EMAsphere dans Claude.
 import json
 import os
 import re
-import sys
 
-if getattr(sys, "frozen", False):
-    _BASE = os.path.dirname(sys.executable)
-else:
-    _BASE = os.path.dirname(os.path.abspath(__file__))
+import paths
 
-SNAPSHOT_PATH = os.path.join(_BASE, "emasphere_renta.json")
+SNAPSHOT_PATH = os.path.join(paths.DATA_DIR, "emasphere_renta.json")
 
 _cache: dict = {"mtime": None, "data": None}
 

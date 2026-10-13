@@ -1,3 +1,5 @@
+import re
+
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -16,6 +18,13 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor
 
 import database as db
+
+
+def _id_key(value) -> tuple[int, int]:
+    """Clé de tri « naturelle » d'un ID chantier : 22026-2 -> (22026, 2) ; sans
+    chiffres -> (0, 0). Tolère les IDs non numériques (sous-chantiers, saisies)."""
+    m = re.match(r"\s*(\d+)(?:\D+(\d+))?", str(value or ""))
+    return (int(m.group(1)), int(m.group(2) or 0)) if m else (0, 0)
 
 
 class HistoriqueTab(QWidget):
@@ -130,7 +139,7 @@ class HistoriqueTab(QWidget):
 
         sort = self._combo_sort.currentText()
         if sort == "ID chantier":
-            rows.sort(key=lambda b: int(b.get("id_chantier") or 0), reverse=True)
+            rows.sort(key=lambda b: _id_key(b.get("id_chantier")), reverse=True)
         elif sort == "Client":
             rows.sort(key=lambda b: (b.get("client") or "").lower())
 

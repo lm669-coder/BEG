@@ -1,13 +1,13 @@
 import sqlite3
 import os
-import sys
 
-if getattr(sys, "frozen", False):
-    _BASE = os.path.dirname(sys.executable)
-else:
-    _BASE = os.path.dirname(os.path.abspath(__file__))
+import paths
 
-DB_PATH = os.path.join(_BASE, "BEG_Data.db")
+DB_PATH = os.path.join(paths.DB_DIR, "BEG_Data.db")
+
+# À incrémenter à chaque nouvelle colonne/table : init_db() ne rejoue le schéma
+# que si PRAGMA user_version est inférieur (évite ~15 requêtes réseau par démarrage).
+SCHEMA_VERSION = 1
 
 _BILAN_CHILD_TABLES = (
     "bilan_parties_prenantes",
@@ -18,17 +18,27 @@ _BILAN_CHILD_TABLES = (
 )
 
 
-def get_conn() -> sqlite3.Connection:
+def get_conn(write: bool = False) -> sqlite3.Connection:
+    """Connexion SQLite. `write=True` prend le verrou d'écriture d'emblée
+    (BEGIN IMMEDIATE) : pas d'interblocage entre deux postes sur le partage réseau.
+    Pas de mode WAL : il est interdit sur un partage réseau."""
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA foreign_keys = ON")
+    if write:
+        conn.execute("BEGIN IMMEDIATE")
     return conn
 
 
 def init_db() -> None:
     conn = get_conn()
     try:
+        # Bases créées en WAL par d'anciennes versions : repasser en journal classique
+        # (persistant dans le fichier ; sans effet si déjà en mode DELETE).
+        if conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal":
+            conn.execute("PRAGMA journal_mode = DELETE")
+        if conn.execute("PRAGMA user_version").fetchone()[0] >= SCHEMA_VERSION:
+            return
         c = conn.cursor()
 
         c.execute("""
@@ -196,6 +206,7 @@ def init_db() -> None:
                 pass  # column already exists
 
         conn.commit()
+        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     finally:
         conn.close()
 
@@ -279,7 +290,7 @@ def bilan_exists_for_chantier(id_chantier: str) -> int | None:
 
 
 def save_bilan(data: dict) -> int:
-    conn = get_conn()
+    conn = get_conn(write=True)
     try:
         c = conn.cursor()
         bilan_id = data.get("id")
@@ -470,7 +481,7 @@ def load_bilan(bilan_id: int) -> dict | None:
 
 
 def delete_bilan(bilan_id: int) -> None:
-    conn = get_conn()
+    conn = get_conn(write=True)
     try:
         conn.execute("DELETE FROM bilans WHERE id=?", (bilan_id,))
         conn.commit()

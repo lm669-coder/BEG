@@ -9,7 +9,7 @@ from reportlab.lib.units import cm
 from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
     SimpleDocTemplate,
-    Paragraph,
+    Paragraph as _RLParagraph,
     Spacer,
     Table,
     TableStyle,
@@ -17,13 +17,18 @@ from reportlab.platypus import (
     Image as RLImage,
 )
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from xml.sax.saxutils import escape as _xml_escape
 
-if getattr(sys, "frozen", False):
-    _BASE = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
-else:
-    _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+import paths
 
-LOGO_PATH = os.path.join(_BASE, "Données", "logo.png")
+
+def Paragraph(text, style, *args, markup: bool = False, **kwargs):
+    """Paragraph reportlab dont le texte est échappé : un « < » ou une balise
+    non fermée saisie par l'utilisateur ne fait plus échouer le PDF.
+    `markup=True` pour du balisage voulu (<b>...</b>)."""
+    return _RLParagraph(text if markup else _xml_escape(str(text)), style, *args, **kwargs)
+
+LOGO_PATH = paths.LOGO_PATH
 
 # ── Palette Apple-inspired ────────────────────────────────────────────────────
 C_DARK = colors.HexColor("#1d1d1f")  # primary text
@@ -594,7 +599,9 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
     if bilan.get("commentaire_general") or bilan.get("point_significatif"):
         story += _section_header(9, "Commentaire Général")
         if bilan.get("point_significatif"):
-            story.append(Paragraph("<b>Le plus significatif :</b>", STYLES["body"]))
+            story.append(
+                Paragraph("<b>Le plus significatif :</b>", STYLES["body"], markup=True)
+            )
             for line in bilan["point_significatif"].split("\n"):
                 story.append(Paragraph(line or " ", STYLES["body"]))
             story.append(Spacer(1, 0.2 * cm))

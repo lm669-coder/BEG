@@ -171,7 +171,7 @@ class ImportTab(QWidget):
         conn = None
         try:
             with open(self._file_ch_path, "rb") as f:
-                conn = db.get_conn()
+                conn = db.get_conn(write=True)
                 ok, skip, detected = imp.import_chantiers(
                     f,
                     self._sheet_ch.currentText(),
@@ -304,7 +304,7 @@ class ImportTab(QWidget):
         conn = None
         try:
             with open(self._file_ea_path, "rb") as f:
-                conn = db.get_conn()
+                conn = db.get_conn(write=True)
                 col_m = self._col_montant_ea.value()
                 ok, det = imp.import_ea(
                     f,
@@ -431,7 +431,7 @@ class ImportTab(QWidget):
         conn = None
         try:
             with open(self._file_dec_path, "rb") as f:
-                conn = db.get_conn()
+                conn = db.get_conn(write=True)
                 ok, det = imp.import_decomptes(
                     f,
                     self._sheet_dec.currentText(),
