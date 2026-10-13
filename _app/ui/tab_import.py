@@ -19,7 +19,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QFont
 
 import database as db
-import import_data as imp
+from lazy import LazyModule
+
+imp = LazyModule("import_data")  # openpyxl : chargé au 1er import Excel
 
 
 class ImportTab(QWidget):

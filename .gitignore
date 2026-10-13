@@ -11,3 +11,6 @@ build/
 dist/
 .idea/
 .vscode/
+
+_app/emasphere_renta.json
+Photos/

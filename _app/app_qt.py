@@ -4,6 +4,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QStatusBar
+from PyQt6.QtCore import QEvent
 from PyQt6.QtGui import QPalette, QColor
 
 import database as db
@@ -178,6 +179,7 @@ class MainWindow(QMainWindow):
         from ui.tab_historique import HistoriqueTab
         from ui.tab_dashboard import DashboardTab
         from ui.tab_import import ImportTab
+        from ui.tab_photos import PhotosTab
 
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
@@ -185,17 +187,38 @@ class MainWindow(QMainWindow):
         self.tab_form = FormulaireTab(self)
         self.tab_hist = HistoriqueTab(self)
         self.tab_dash = DashboardTab(self)
+        self.tab_photos = PhotosTab(self)
         self.tab_import = ImportTab(self)
 
         self.tabs.addTab(self.tab_form, "Formulaire")
         self.tabs.addTab(self.tab_hist, "Historique")
         self.tabs.addTab(self.tab_dash, "Dashboard")
+        self.tabs.addTab(self.tab_photos, "Photos")
         self.tabs.addTab(self.tab_import, "Importer Excel")
 
         self.tabs.currentChanged.connect(self._on_tab_changed)
 
         self.setCentralWidget(self.tabs)
         self.setStatusBar(QStatusBar())
+        # Dépôt de photos/dossiers n'importe où dans la fenêtre
+        QApplication.instance().installEventFilter(self)
+
+    def eventFilter(self, obj, ev):
+        t = ev.type()
+        if t in (QEvent.Type.DragEnter, QEvent.Type.DragMove, QEvent.Type.Drop):
+            w = obj if hasattr(obj, "window") else None
+            if w is not None and w.window() is self and ev.mimeData().hasUrls():
+                from ui.tab_photos import _collect, _paths_from_mime
+
+                paths = _paths_from_mime(ev.mimeData())
+                if paths and _collect(paths):
+                    if t == QEvent.Type.Drop:
+                        self.tabs.setCurrentWidget(self.tab_photos)
+                        self.tab_photos.refresh()
+                        self.tab_photos.import_paths(paths)
+                    ev.acceptProposedAction()
+                    return True
+        return super().eventFilter(obj, ev)
 
     def _on_tab_changed(self, idx):
         widget = self.tabs.widget(idx)

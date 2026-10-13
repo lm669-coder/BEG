@@ -591,9 +591,14 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
             )
 
     # ── 9. Commentaire général ────────────────────────────────────────────────
-    if bilan.get("commentaire_general"):
+    if bilan.get("commentaire_general") or bilan.get("point_significatif"):
         story += _section_header(9, "Commentaire Général")
-        for line in bilan["commentaire_general"].split("\n"):
+        if bilan.get("point_significatif"):
+            story.append(Paragraph("<b>Le plus significatif :</b>", STYLES["body"]))
+            for line in bilan["point_significatif"].split("\n"):
+                story.append(Paragraph(line or " ", STYLES["body"]))
+            story.append(Spacer(1, 0.2 * cm))
+        for line in (bilan.get("commentaire_general") or "").split("\n"):
             story.append(Paragraph(line or " ", STYLES["body"]))
 
     # ── Pied de page ─────────────────────────────────────────────────────────

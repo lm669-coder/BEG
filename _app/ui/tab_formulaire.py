@@ -20,12 +20,21 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QFileDialog,
     QFrame,
+    QDialog,
+    QCheckBox,
+    QDialogButtonBox,
+    QListWidget,
+    QListWidgetItem,
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
 import database as db
-import pdf_export
+import duc_parser
+import emasphere_client
+from lazy import LazyModule
+
+pdf_export = LazyModule("pdf_export")  # reportlab : chargé à la 1re génération de PDF
 
 BEG_BLUE = "#1a3a5c"
 _DATE_FORMATS = ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y")
@@ -404,11 +413,71 @@ class STSection(DynamicSection):
             )
 
 
+class DucDialog(QDialog):
+    """Aperçu de la DUC : choix des sous-traitants à importer."""
+
+    def __init__(self, duc: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Import depuis la DUC")
+        self.resize(560, 520)
+        vl = QVBoxLayout(self)
+
+        mo_c, mo_x = duc["mo_conception"], duc["mo_controle"]
+        lignes = [f"Maître d'oeuvre (conception) : {mo_c or '—'}"]
+        if mo_x and mo_x != mo_c:
+            lignes.append(f"Maître d'oeuvre (contrôle exécution) : {mo_x}")
+        coord = duc["coord_realisation"] or duc["coord_elaboration"]
+        lignes.append(f"Coordinateur sécurité : {coord or '—'}")
+        lbl = QLabel("\n".join(lignes))
+        lbl.setWordWrap(True)
+        vl.addWidget(lbl)
+
+        self._chk_arch = QCheckBox("Importer l'architecte / maître d'oeuvre et le coordinateur")
+        self._chk_arch.setChecked(True)
+        vl.addWidget(self._chk_arch)
+
+        sts = duc["sous_traitants"]
+        directs = [x for x in sts if x["direct"]]
+        vl.addWidget(
+            QLabel(
+                f"Sous-traitants directs ({len(directs)} sur {len(sts)} déclarés) — "
+                "agences d'intérim décochées :"
+            )
+        )
+        self._list = QListWidget()
+        for x in directs:
+            it = QListWidgetItem(x["nom"])
+            it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            it.setCheckState(
+                Qt.CheckState.Unchecked if x["interim"] else Qt.CheckState.Checked
+            )
+            self._list.addItem(it)
+        vl.addWidget(self._list, 1)
+
+        bb = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        vl.addWidget(bb)
+
+    def import_architecte(self) -> bool:
+        return self._chk_arch.isChecked()
+
+    def selected(self) -> list[str]:
+        return [
+            self._list.item(i).text()
+            for i in range(self._list.count())
+            if self._list.item(i).checkState() == Qt.CheckState.Checked
+        ]
+
+
 class FormulaireTab(QWidget):
     def __init__(self, main_window, parent=None):
         super().__init__(parent)
         self._main = main_window
         self._loaded_id = None
+        self._ema_autofill = None
         self._chantier_info = None
         self._montant_facture = 0.0
 
@@ -541,6 +610,7 @@ class FormulaireTab(QWidget):
         # Pré-remplit le facturé EA depuis la BDD sauf si déjà saisi manuellement
         if self._loaded_id is None and not self._montant_facture_ea.value():
             self._montant_facture_ea.setValue(self._montant_facture)
+        self._apply_emasphere(id_c, ch)
 
         if ch:
             self._show_chantier_info(ch)
@@ -553,6 +623,40 @@ class FormulaireTab(QWidget):
             self._warn_chantier.setText("⚠ ID chantier non trouvé dans la base.")
 
         self._update_calculs()
+
+    def _apply_emasphere(self, id_c: str, ch: dict | None):
+        """Facturé et coûts réels d'EMAsphere (n'écrase pas une saisie manuelle)."""
+        self._ema_lbl.setText("")
+        self._ema_lbl.setStyleSheet("")
+        if self._loaded_id is not None:
+            return
+        r = emasphere_client.get_marge_reelle(id_c, (ch or {}).get("departement"))
+        if not r:
+            self._ema_lbl.setText("EMAsphere : chantier non trouvé dans l'extraction.")
+            self._ema_lbl.setStyleSheet("color:#c0392b;")
+            last = self._ema_autofill
+            if last and self._montant_facture_ea.value() == last[0]:
+                self._montant_facture_ea.setValue(round(self._montant_facture, 2))
+            if last and self._cout_execution.value() == last[1]:
+                self._cout_execution.setValue(0)
+            self._ema_autofill = None
+            return
+        fact, cout = self._montant_facture_ea.value(), self._cout_execution.value()
+        last = self._ema_autofill or (None, None)
+        # Valeurs « automatiques » (vides, issues des EA ou d'un précédent appel) :
+        # seules ces valeurs sont remplacées, jamais une saisie manuelle.
+        if fact in (0, round(self._montant_facture, 2), last[0]) and cout in (0, last[1]):
+            self._ema_autofill = (round(r["facture"], 2), round(r["couts"], 2))
+            self._montant_facture_ea.setValue(r["facture"])
+            self._cout_execution.setValue(r["couts"])
+        txt = (
+            f"Source EMAsphere ({r['cle']}, extrait du {r['extrait_le']}) : "
+            f"facturé {_fmt_eur(r['facture'])} — coûts {_fmt_eur(r['couts'])}"
+        )
+        if r["regroupe"]:
+            txt += " — cumul de tous les sous-chantiers du numéro"
+        self._ema_lbl.setText(txt)
+        self._ema_lbl.setStyleSheet("color:#1a3a5c;")
 
     def _prefill_from_chantier(self, ch: dict, id_c: str):
         if ch.get("delai_execution"):
@@ -576,6 +680,20 @@ class FormulaireTab(QWidget):
     # ── Section 2 : Parties prenantes ──────────────────────────────────────
     def _build_section2(self):
         self._vl.addWidget(_section_label("2. PARTIES PRENANTES"))
+
+        hl_duc = QHBoxLayout()
+        btn_duc = QPushButton("📄 Importer depuis la DUC")
+        btn_duc.setObjectName("btn_secondary")
+        btn_duc.setToolTip(
+            "Lit la DUC du chantier (SharePoint synchronisé) : architecte, "
+            "coordinateur sécurité et sous-traitants."
+        )
+        btn_duc.clicked.connect(self._import_duc)
+        hl_duc.addWidget(btn_duc)
+        self._duc_lbl = QLabel("")
+        self._duc_lbl.setFont(QFont("Segoe UI", 8))
+        hl_duc.addWidget(self._duc_lbl, 1)
+        self._vl.addLayout(hl_duc)
 
         grp = QGroupBox()
         grp.setTitle("Parties prenantes fixes")
@@ -638,6 +756,48 @@ class FormulaireTab(QWidget):
         self._vl.addWidget(QLabel("Autres parties prenantes :"))
         self._pp_extra = PPExtraSection()
         self._vl.addWidget(self._pp_extra)
+
+    def _import_duc(self):
+        id_c = self._id_chantier.text().strip()
+        ch = self._chantier_info or {}
+        path = duc_parser.find_duc(id_c, ch.get("departement")) if id_c else None
+        if not path:
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Choisir la DUC (PDF)", "", "PDF (*.pdf)"
+            )
+            if not path:
+                return
+        try:
+            duc = duc_parser.parse_duc(path)
+        except Exception as e:  # PDF illisible, pypdf absent...
+            QMessageBox.warning(self, "DUC", f"Lecture de la DUC impossible :\n{e}")
+            return
+
+        dlg = DucDialog(duc, self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        if dlg.import_architecte():
+            archi = duc["mo_conception"]
+            if duc["mo_controle"] and duc["mo_controle"] != archi:
+                archi = f"{archi} / {duc['mo_controle']} (contrôle)" if archi else duc["mo_controle"]
+            if archi and not self._pp_arch_nom.text().strip():
+                self._pp_arch_nom.setText(archi)
+            coord = duc["coord_realisation"] or duc["coord_elaboration"]
+            deja = {d["nom"] for d in self._pp_extra.get_data()}
+            if coord and coord not in deja:
+                self._pp_extra.add_row(role="Coordinateur sécurité", nom=coord)
+
+        existants = {d["nom"].strip().lower() for d in self._st_section.get_data()}
+        ajoutes = 0
+        for nom in dlg.selected():
+            if nom.strip().lower() not in existants:
+                self._st_section.add_row(nom=nom)
+                existants.add(nom.strip().lower())
+                ajoutes += 1
+        self._duc_lbl.setText(
+            f"DUC {os.path.basename(path)} — {ajoutes} sous-traitant(s) ajouté(s)"
+        )
 
     # ── Section 3 : Performance ────────────────────────────────────────────
     def _build_section3(self):
@@ -791,6 +951,9 @@ class FormulaireTab(QWidget):
         hl2b.addLayout(vl)
         hl2b.addStretch()
         bud_vl.addLayout(hl2b)
+        self._ema_lbl = QLabel("")
+        self._ema_lbl.setFont(QFont("Segoe UI", 8))
+        bud_vl.addWidget(self._ema_lbl)
 
         self._montant_facture_ea.valueChanged.connect(self._update_calculs)
         self._cout_execution.valueChanged.connect(self._update_calculs)
@@ -1068,6 +1231,12 @@ class FormulaireTab(QWidget):
     def _build_section8(self):
         self._vl.addWidget(_section_label("8. COMMENTAIRE GÉNÉRAL / SYNTHÈSE"))
         self._vl.addWidget(
+            QLabel("Ce qui a été le plus significatif sur ce chantier (champ libre) :")
+        )
+        self._significatif = QTextEdit()
+        self._significatif.setFixedHeight(80)
+        self._vl.addWidget(self._significatif)
+        self._vl.addWidget(
             QLabel("Points forts, points faibles, enseignements pour l'avenir :")
         )
         self._commentaire = QTextEdit()
@@ -1157,6 +1326,7 @@ class FormulaireTab(QWidget):
             "ameliorations_securite": self._ameliorations_securite.toPlainText()
             or None,
             "commentaire_general": self._commentaire.toPlainText() or None,
+            "point_significatif": self._significatif.toPlainText() or None,
             "notes_sous_traitants": self._notes_st.toPlainText() or None,
             "parties_prenantes": self._collect_pp_fixed() + self._pp_extra.get_data(),
             "sous_traitants": self._st_section.get_data(),
@@ -1230,6 +1400,8 @@ class FormulaireTab(QWidget):
     # ── Chargement / reset ────────────────────────────────────────────────
     def reset_form(self):
         self._loaded_id = None
+        self._ema_autofill = None
+        self._ema_lbl.setText("")
         self._chantier_info = None
         self._montant_facture = 0.0
         self._id_chantier.setText("")
@@ -1275,6 +1447,7 @@ class FormulaireTab(QWidget):
             self._desc_accidents,
             self._ameliorations_securite,
             self._commentaire,
+            self._significatif,
             self._notes_st,
         ):
             te.setPlainText("")
@@ -1322,6 +1495,7 @@ class FormulaireTab(QWidget):
             bilan.get("ameliorations_securite") or ""
         )
         self._commentaire.setPlainText(bilan.get("commentaire_general") or "")
+        self._significatif.setPlainText(bilan.get("point_significatif") or "")
         self._notes_st.setPlainText(bilan.get("notes_sous_traitants") or "")
 
         # PP fixes

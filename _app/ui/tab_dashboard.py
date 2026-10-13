@@ -9,16 +9,25 @@ from PyQt6.QtGui import QFont
 
 import database as db
 
-try:
-    import matplotlib
+_MPL = None  # (FigureCanvasQTAgg, Figure) ou False si indisponible
 
-    matplotlib.use("QtAgg")
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-    from matplotlib.figure import Figure
 
-    HAS_MPL = True
-except Exception:
-    HAS_MPL = False
+def _load_mpl():
+    """matplotlib est lourd : importé seulement à l'ouverture du Dashboard."""
+    global _MPL
+    if _MPL is None:
+        try:
+            import matplotlib
+
+            matplotlib.use("QtAgg")
+            from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+            from matplotlib.figure import Figure
+
+            _MPL = (FigureCanvasQTAgg, Figure)
+        except Exception:
+            _MPL = False
+    return _MPL
+
 
 BEG_BLUE = "#1a3a5c"
 
@@ -75,14 +84,24 @@ class DashboardTab(QWidget):
             hl_m.addWidget(c)
         vl.addLayout(hl_m)
 
-        if HAS_MPL:
-            self._fig = Figure(figsize=(12, 4), tight_layout=True)
-            self._canvas = FigureCanvasQTAgg(self._fig)
-            vl.addWidget(self._canvas, 1)
-        else:
-            vl.addWidget(QLabel("matplotlib non disponible — graphiques désactivés."))
+        self._vl_main = vl
+        self._canvas = None
+        self._fig = None
 
-        vl.addStretch()
+    def _ensure_canvas(self) -> bool:
+        if self._canvas is None:
+            mpl = _load_mpl()
+            if mpl:
+                canvas_cls, fig_cls = mpl
+                self._fig = fig_cls(figsize=(12, 4), tight_layout=True)
+                self._canvas = canvas_cls(self._fig)
+                self._vl_main.addWidget(self._canvas, 1)
+            else:
+                self._canvas = False
+                self._vl_main.addWidget(
+                    QLabel("matplotlib non disponible — graphiques désactivés.")
+                )
+        return bool(self._canvas)
 
     def refresh(self):
         bilans = db.get_all_bilans()
@@ -104,7 +123,7 @@ class DashboardTab(QWidget):
 
         self._card_chantiers.set_value(f"{len(chantiers)} / {len(bilans)}")
 
-        if not HAS_MPL or not bilans:
+        if not bilans or not self._ensure_canvas():
             return
 
         self._fig.clear()
