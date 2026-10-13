@@ -1,8 +1,8 @@
 @echo off
-title BEG RMI — Configuration Python portable
+title BEG — Configuration Python portable
 chcp 65001 >nul 2>&1
 echo ============================================
-echo    BEG RMI — Configuration Python portable
+echo    BEG — Configuration Python portable
 echo ============================================
 echo.
 echo  Ce script installe Python dans le dossier

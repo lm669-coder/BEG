@@ -1,5 +1,5 @@
 """
-Tests pytest complets pour les 3 modules backend BEG RMI.
+Tests pytest complets pour les 3 modules backend BEG.
 Chaque test utilise une DB isolée (tmpfile) ou une connexion en mémoire.
 Aucun import Qt — modules backend purs.
 """

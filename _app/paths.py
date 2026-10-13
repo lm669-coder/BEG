@@ -50,5 +50,5 @@ DB_DIR_EXPLICIT = bool(_cfg("db_dir", "BEG_DB_DIR"))  # configurée => ne jamais
 DB_DIR = _cfg("db_dir", "BEG_DB_DIR") or DATA_DIR
 
 CACHE_DIR = os.path.join(
-    os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "BEG_RMI", "cache"
+    os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "BEG", "cache"
 )

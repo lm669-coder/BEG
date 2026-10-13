@@ -1,7 +1,7 @@
 @echo off
-title Bilan d'Experience BEG RMI
+title Bilan d'Experience BEG
 echo ============================================
-echo    Bilan d'Experience - BEG RMI
+echo    Bilan d'Experience - BEG
 echo ============================================
 echo.
 

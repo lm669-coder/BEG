@@ -1,4 +1,4 @@
-# BEG RMI — Avancement développement
+# BEG — Avancement développement
 
 ## Session 2026-06-25
 

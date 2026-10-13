@@ -1,4 +1,4 @@
-# Reprise développement BEG RMI — jeudi 2026-06-26
+# Reprise développement BEG — jeudi 2026-06-26
 
 ## Décision prise
 Réécrire l'app en **PyQt6** (application de bureau Windows native, sans navigateur).
