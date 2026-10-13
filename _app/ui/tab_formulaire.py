@@ -107,7 +107,8 @@ class PPExtraSection(DynamicSection):
         rel_e = QLineEdit(relation)
         rel_e.setPlaceholderText("Relation / Appréciation")
         eval_s = QSpinBox()
-        eval_s.setRange(1, 5)
+        eval_s.setRange(0, 5)
+        eval_s.setSpecialValueText("—")  # 0 = non évalué
         eval_s.setValue(evaluation)
         eval_s.setFixedWidth(55)
 
@@ -151,7 +152,7 @@ class PPExtraSection(DynamicSection):
                 role=item.get("role", ""),
                 nom=item.get("nom", ""),
                 relation=item.get("relation", ""),
-                evaluation=item.get("evaluation", 3) or 3,
+                evaluation=3 if item.get("evaluation") is None else item["evaluation"],
             )
 
 
@@ -357,8 +358,10 @@ class STSection(DynamicSection):
             lbl = QLabel(lbl_text)
             lbl.setFixedWidth(44)
             spin = QSpinBox()
-            spin.setRange(1, 5)
-            spin.setValue(scores.get(key, 3) or 3)
+            spin.setRange(0, 5)
+            spin.setSpecialValueText("—")  # 0 = non évalué (exclu de la moyenne)
+            v = scores.get(key)
+            spin.setValue(3 if v is None else v)
             spin.setFixedWidth(46)
             spin_widgets.append((lbl, spin, key))
 
@@ -367,9 +370,8 @@ class STSection(DynamicSection):
         avg_lbl.setStyleSheet("font-weight:bold; color:#1a3a5c; padding:2px 4px;")
 
         def _update_avg():
-            vals = [spin.value() for _, spin, _ in spin_widgets]
-            avg = sum(vals) / len(vals)
-            avg_lbl.setText(f"Moy: {avg:.1f}")
+            vals = [spin.value() for _, spin, _ in spin_widgets if spin.value() > 0]
+            avg_lbl.setText(f"Moy: {sum(vals) / len(vals):.1f}" if vals else "Moy: —")
 
         for _, spin, _ in spin_widgets:
             spin.valueChanged.connect(_update_avg)
@@ -710,21 +712,24 @@ class FormulaireTab(QWidget):
         self._pp_client_nom = QLineEdit()
         self._pp_client_rel = QLineEdit()
         self._pp_client_eval = QSpinBox()
-        self._pp_client_eval.setRange(1, 5)
+        self._pp_client_eval.setRange(0, 5)
+        self._pp_client_eval.setSpecialValueText("—")
         self._pp_client_eval.setValue(3)
         self._pp_client_eval.setFixedWidth(55)
 
         self._pp_arch_nom = QLineEdit()
         self._pp_arch_rel = QLineEdit()
         self._pp_arch_eval = QSpinBox()
-        self._pp_arch_eval.setRange(1, 5)
+        self._pp_arch_eval.setRange(0, 5)
+        self._pp_arch_eval.setSpecialValueText("—")
         self._pp_arch_eval.setValue(3)
         self._pp_arch_eval.setFixedWidth(55)
 
         self._pp_be_nom = QLineEdit()
         self._pp_be_rel = QLineEdit()
         self._pp_be_eval = QSpinBox()
-        self._pp_be_eval.setRange(1, 5)
+        self._pp_be_eval.setRange(0, 5)
+        self._pp_be_eval.setSpecialValueText("—")
         self._pp_be_eval.setValue(3)
         self._pp_be_eval.setFixedWidth(55)
 
@@ -1521,7 +1526,7 @@ class FormulaireTab(QWidget):
             p = pp_fixed.get(role, {})
             nom_e.setText(p.get("nom") or "")
             rel_e.setText(p.get("relation") or "")
-            eval_s.setValue(p.get("evaluation") or 3)
+            eval_s.setValue(3 if p.get("evaluation") is None else p["evaluation"])
 
         self._pp_extra.load(pp_extra)
         self._st_section.load(bilan.get("sous_traitants", []))

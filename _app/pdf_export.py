@@ -136,7 +136,7 @@ def _pct(v):
 
 
 def _stars(n):
-    if n is None:
+    if not n:  # None ou 0 = non évalué
         return "—"
     return "★" * int(n) + "·" * (5 - int(n)) + f"  {n}/5"
 
@@ -557,7 +557,7 @@ def generate_pdf(bilan: dict, chantier: dict, montant_facture: float) -> bytes:
                     "communication",
                 )
             ]
-            valid = [x for x in scores if x is not None]
+            valid = [x for x in scores if x]  # 0 / None = non évalué
             avg = round(sum(valid) / len(valid), 1) if valid else None
             if avg:
                 avg_totals.append(avg)
