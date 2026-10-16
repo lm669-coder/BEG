@@ -30,9 +30,11 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
+import chantier_dirs
 import database as db
 import duc_parser
 import emasphere_client
+import paths
 from lazy import LazyModule
 
 pdf_export = LazyModule("pdf_export")  # reportlab : chargé à la 1re génération de PDF
@@ -1424,17 +1426,50 @@ class FormulaireTab(QWidget):
             data, ch, self._montant_facture_ea.value() or self._montant_facture
         )
         fname = f"Bilan_{id_c}_{date.today().strftime('%Y%m%d')}.pdf"
-        default_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "PDFs"
-        )
-        os.makedirs(default_dir, exist_ok=True)
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Enregistrer le PDF", os.path.join(default_dir, fname), "PDF (*.pdf)"
-        )
-        if path:
+        dossier, repli = self._pdf_target(id_c)
+        path = os.path.join(dossier, fname)
+        try:
             with open(path, "wb") as f:
                 f.write(pdf_bytes)
-            self._main.status(f"PDF enregistré : {path}")
+        except OSError as e:
+            if repli:
+                QMessageBox.critical(
+                    self, "PDF", f"Impossible d'enregistrer le PDF :\n{path}\n\n{e}"
+                )
+                return
+            # Dossier du chantier protégé ou réseau absent : repli, sans rien perdre
+            dossier, repli = self._pdf_fallback(id_c), True
+            path = os.path.join(dossier, fname)
+            with open(path, "wb") as f:
+                f.write(pdf_bytes)
+        self._main.status(f"PDF enregistré : {path}")
+        if repli:
+            QMessageBox.warning(
+                self,
+                "PDF",
+                "Le dossier du chantier est introuvable (nouveau chantier, nom "
+                "différent, droits ou réseau absents).\n\nLe PDF a été enregistré en "
+                "repli dans :\n" + path + "\n\nÀ déplacer ensuite dans « Satisfaction & "
+                "Expérience\\Bilan d'expérience » du chantier.",
+            )
+
+    def _pdf_fallback(self, id_c: str) -> str:
+        d = os.path.join(paths.DATA_DIR, "PDFs")
+        os.makedirs(d, exist_ok=True)
+        return d
+
+    def _pdf_target(self, id_c: str) -> tuple[str, bool]:
+        """(dossier du PDF, repli) : <chantier>/Satisfaction & Expérience/Bilan
+        d'expérience (SharePoint si en cours, archives S: si clos) ; à défaut data/PDFs.
+        L'arborescence est créée au premier enregistrement."""
+        dept = (self._chantier_info or {}).get("departement")
+        try:
+            r = chantier_dirs.satisfaction_dirs(id_c, dept, create=True)
+        except OSError:
+            r = None
+        if r:
+            return r[1], False
+        return self._pdf_fallback(id_c), True
 
     def _save_and_pdf(self):
         self._save()

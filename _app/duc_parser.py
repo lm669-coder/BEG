@@ -9,14 +9,8 @@ Les DUC sont rangées dans `<dossier chantier>/DUC/*.pdf` sur SharePoint
 import glob
 import os
 import re
-from pathlib import Path
 
-# Racines SharePoint synchronisées : (dossier racine, dossier « affaires en cours »)
-_SP_ROOT = Path.home() / "MIGNONE S.A" / "SP - Documents"
-_AFFAIRES = {
-    "bat": [("02. Batiment", "21. Affaires en cours BAT")],
-    "elec": [("01. Electricité", "11. Affaires en cours")],
-}
+import chantier_dirs
 
 _SOCIETE = "M.I.G.N.O.N.E"
 
@@ -68,18 +62,10 @@ _RE_ANGLAIS = re.compile(r"(^|[_\- ])EN([_. ]|$)", re.IGNORECASE)
 def find_duc_all(id_chantier: str, departement: str | None = None) -> list[str]:
     """PDF candidats du dossier DUC du chantier (hors versions anglaises),
     versions « _FR » d'abord, puis les plus récents."""
-    m = re.match(r"\s*(\d+)", id_chantier or "")
-    if not m:
-        return []
-    num = m.group(1)
-    d = (departement or "").strip().lower()
-    cles = [d] if d in _AFFAIRES else list(_AFFAIRES)
+    # Dossiers du chantier (en cours sur SharePoint, sinon archives S:) : voir chantier_dirs
     candidats: list[str] = []
-    for cle in cles:
-        for dept_dir, affaires_dir in _AFFAIRES[cle]:
-            base = _SP_ROOT / dept_dir / affaires_dir
-            for dossier in glob.glob(glob.escape(str(base)) + os.sep + num + "*"):
-                candidats += glob.glob(os.path.join(dossier, "DUC", "*.pdf"))
+    for dossier in chantier_dirs.find_chantier_dirs(id_chantier, departement):
+        candidats += glob.glob(os.path.join(glob.escape(dossier), "DUC", "*.pdf"))
     candidats = [c for c in candidats if not _RE_ANGLAIS.search(os.path.splitext(os.path.basename(c))[0])]
     candidats.sort(
         key=lambda p: ("_FR" in os.path.basename(p), os.path.getmtime(p)), reverse=True

@@ -23,18 +23,20 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QSize, QThread, QUrl, pyqtSignal
 from PyQt6.QtGui import QDesktopServices, QFont, QIcon, QImage, QImageReader, QPixmap
 
+import chantier_dirs
 import database as db
 import paths
 
 BEG_BLUE = "#1a3a5c"
 IMG_EXT = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp", ".heic"}
 THUMB = 140
-THUMB_DIR = ".thumbs"  # miniatures légères, à côté des photos (partagées)
+THUMB_DIR = ".thumbs"  # anciennes miniatures rangées à côté des photos (ignorées)
 MAX_SIDE = 2560  # côté max après réduction
 REDUCE_ABOVE = 1_500_000  # on ne réduit que les JPEG plus lourds que 1,5 Mo
 WORKERS = 4  # copies en parallèle (masque la latence du disque réseau)
 
-# Les photos sont rangées à côté de la base : <dossier données>/Photos/<id chantier>/
+# Les photos vont dans le dossier du chantier (chantier_dirs) ; à défaut (dossier
+# introuvable), repli sur <dossier données>/Photos/<id chantier>/
 PHOTOS_ROOT = os.path.join(paths.DATA_DIR, "Photos")
 
 
@@ -45,14 +47,36 @@ class ImportResult(NamedTuple):
     saved: int  # octets gagnés par la réduction
     cancelled: bool
     errors: list
+    dossier: str = ""  # dossier de destination
+    repli: bool = False  # True : dossier chantier introuvable, photos rangées en repli
 
 
 def _safe(name: str) -> str:
     return re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name.strip()).strip(" .") or "_"
 
 
-def chantier_dir(id_chantier: str) -> str:
-    return os.path.join(PHOTOS_ROOT, _safe(id_chantier))
+def _dept(id_chantier: str) -> str | None:
+    try:
+        return (db.get_chantier(id_chantier) or {}).get("departement")
+    except Exception:
+        return None
+
+
+def photos_target(id_chantier: str, create: bool = False) -> tuple[str, bool]:
+    """(dossier des photos, repli). Normal : <chantier>/Satisfaction & Expérience/Photos
+    (SharePoint si le chantier est en cours, archives S: s'il est clos). Repli
+    (dossier introuvable, ambigu, droits ou réseau absents) : PHOTOS_ROOT/<id>."""
+    try:
+        r = chantier_dirs.satisfaction_dirs(id_chantier, _dept(id_chantier), create=create)
+    except OSError:
+        r = None
+    if r:
+        return r[0], False
+    return os.path.join(PHOTOS_ROOT, _safe(id_chantier)), True
+
+
+def chantier_dir(id_chantier: str, create: bool = False) -> str:
+    return photos_target(id_chantier, create)[0]
 
 
 def _is_image(path: str) -> bool:
@@ -87,10 +111,11 @@ def _unique(dest_dir: str, name: str, reserved: set[str]) -> str:
 
 
 # ── Miniatures ────────────────────────────────────────────────────────────
-def thumb_path(id_base: str, photo: str) -> str:
-    rel = os.path.relpath(photo, id_base).lower()
+def thumb_path(photo: str) -> str:
+    """Miniature dans le cache LOCAL du poste (jamais dans le dossier du chantier)."""
+    key = os.path.normcase(os.path.abspath(photo))
     return os.path.join(
-        id_base, THUMB_DIR, hashlib.md5(rel.encode("utf-8")).hexdigest() + ".jpg"
+        paths.CACHE_DIR, "thumbs", hashlib.md5(key.encode("utf-8")).hexdigest() + ".jpg"
     )
 
 
@@ -113,9 +138,9 @@ def make_thumb(src: str, dst: str) -> QImage:
     return img
 
 
-def load_thumb(id_base: str, photo: str) -> QImage:
+def load_thumb(photo: str) -> QImage:
     """Miniature en cache (rapide) ou, à défaut, générée depuis la photo."""
-    tp = thumb_path(id_base, photo)
+    tp = thumb_path(photo)
     if os.path.isfile(tp):
         img = QImage(tp)
         if not img.isNull():
@@ -160,7 +185,7 @@ def import_photos(
     workers: int = WORKERS,
 ) -> ImportResult:
     """Copie photos/dossiers dans le dossier du chantier (en parallèle)."""
-    base = chantier_dir(id_chantier)
+    base, repli = photos_target(id_chantier, create=True)
     items = _collect(paths_)
     reserved: set[str] = set()
     plan: list[tuple[str, str]] = []
@@ -179,7 +204,7 @@ def import_photos(
             reduced = _copy_or_reduce(src, dest, reduce)
             saved = before - os.path.getsize(dest) if reduced else 0
             try:  # la miniature est faite depuis la source (locale = rapide)
-                make_thumb(src, thumb_path(base, dest))
+                make_thumb(src, thumb_path(dest))
             except Exception:
                 pass
             return ("ok", int(reduced), saved)
@@ -211,7 +236,9 @@ def import_photos(
                 cancelled = True
             if progress:
                 progress(done, total, os.path.basename(futs[fut]))
-    return ImportResult(copied, total - copied, reduced, saved, cancelled, errors)
+    return ImportResult(
+        copied, total - copied, reduced, saved, cancelled, errors, base, repli
+    )
 
 
 def list_photos(id_chantier: str) -> list[str]:
@@ -255,9 +282,9 @@ class ImportWorker(QThread):
 class ThumbWorker(QThread):
     ready = pyqtSignal(int, int, QImage)  # génération, index, miniature
 
-    def __init__(self, gen: int, base: str, photos: list[str], parent=None):
+    def __init__(self, gen: int, photos: list[str], parent=None):
         super().__init__(parent)
-        self._gen, self._base, self._photos = gen, base, photos
+        self._gen, self._photos = gen, photos
         self._stop = False
 
     def stop(self):
@@ -268,7 +295,7 @@ class ThumbWorker(QThread):
             if self._stop:
                 return
             try:
-                img = load_thumb(self._base, p)
+                img = load_thumb(p)
             except Exception:
                 continue
             if not img.isNull():
@@ -411,7 +438,7 @@ class PhotosTab(QWidget):
                 "Aucun ID chantier : saisissez-le dans le Formulaire pour voir et ajouter des photos."
             )
             return
-        base = chantier_dir(id_c)
+        base, repli = photos_target(id_c)
         photos = list_photos(id_c)
         # Les lignes apparaissent tout de suite ; les miniatures arrivent d'un thread
         # (jamais de lecture de photo complète sur le fil de l'interface).
@@ -421,10 +448,16 @@ class PhotosTab(QWidget):
             it.setData(Qt.ItemDataRole.UserRole, path)
             it.setToolTip(path if album == "." else f"{album}\n{path}")
             self._list.addItem(it)
-        self._count.setText(f"{len(photos)} photo(s) — {base}")
+        avert = (
+            "\n⚠ Dossier du chantier introuvable : photos rangées en repli dans "
+            "data\\Photos (à déplacer ensuite dans « Satisfaction & Expérience\\Photos »)."
+            if repli
+            else ""
+        )
+        self._count.setText(f"{len(photos)} photo(s) — {base}{avert}")
         if photos:
             self._gen += 1
-            w = ThumbWorker(self._gen, base, photos)
+            w = ThumbWorker(self._gen, photos)
             w.ready.connect(self._on_thumb)
             w.finished.connect(lambda w=w: self._forget_worker(w))
             self._thumb_workers.append(w)
@@ -487,6 +520,8 @@ class PhotosTab(QWidget):
         self._set_importing(False)
         self.refresh()
         msg = f"{res.copied} photo(s) ajoutée(s) au chantier {self._import_id}"
+        if res.copied and res.dossier:
+            msg += f" ({res.dossier})"
         if res.reduced:
             msg += f", {res.reduced} réduite(s) (−{res.saved / 1e6:.0f} Mo)"
         if res.cancelled:
@@ -496,6 +531,16 @@ class PhotosTab(QWidget):
         elif not res.copied and not res.cancelled:
             msg = "Aucune image reconnue dans ce qui a été déposé."
         self._main.status(msg)
+        if res.repli and res.copied:
+            QMessageBox.warning(
+                self,
+                "Photos",
+                "Le dossier du chantier est introuvable (nouveau chantier, nom différent, "
+                "droits ou réseau absents).\n\nLes photos ont été rangées en repli dans :\n"
+                + res.dossier
+                + "\n\nÀ déplacer ensuite dans « Satisfaction & Expérience\\Photos » "
+                "du chantier.",
+            )
         if res.errors:
             QMessageBox.warning(
                 self,
@@ -532,8 +577,15 @@ class PhotosTab(QWidget):
         id_c = self._current_id()
         if not id_c:
             return
-        d = chantier_dir(id_c)
-        os.makedirs(d, exist_ok=True)
+        d, _repli = photos_target(id_c)
+        if not os.path.isdir(d):
+            # Pas encore de dossier photos : ouvrir le dossier du chantier s'il existe,
+            # sans rien créer (la création se fait au premier import / PDF).
+            r = chantier_dirs.resolve(id_c, _dept(id_c))
+            if r.path:
+                d = r.path
+            else:
+                os.makedirs(d, exist_ok=True)
         QDesktopServices.openUrl(QUrl.fromLocalFile(d))
 
     def _delete_selected(self):
@@ -548,10 +600,9 @@ class PhotosTab(QWidget):
         )
         if rep != QMessageBox.StandardButton.Yes:
             return
-        base = chantier_dir(self._current_id())
         for it in items:
             p = it.data(Qt.ItemDataRole.UserRole)
-            for f in (p, thumb_path(base, p)):
+            for f in (p, thumb_path(p)):
                 try:
                     os.remove(f)
                 except OSError:

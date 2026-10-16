@@ -1,6 +1,7 @@
 import datetime
 import glob
 import os
+import shutil
 import sqlite3
 import time
 
@@ -47,35 +48,60 @@ def get_conn(write: bool = False) -> sqlite3.Connection:
 BACKUP_DAYS = 14
 
 
+def _purge_old(folder: str, today: datetime.date, days: int) -> None:
+    limite = f"{today - datetime.timedelta(days=days):%Y%m%d}"
+    for f in glob.glob(os.path.join(folder, "BEG_Data_*.db")):
+        stamp = os.path.basename(f)[len("BEG_Data_"):][:8]
+        if stamp.isdigit() and stamp < limite:
+            os.remove(f)
+
+
+def _copy_secours(target: str, today: datetime.date, days: int) -> None:
+    """Copie la sauvegarde du jour vers le dossier de secours (partage réseau).
+    Silencieux : un réseau absent ne doit jamais gêner l'application."""
+    sec = paths.BACKUP_DIR_SECOURS
+    if not sec or not os.path.exists(target):
+        return
+    dest = os.path.join(sec, os.path.basename(target))
+    if os.path.exists(dest):
+        return
+    try:
+        os.makedirs(sec, exist_ok=True)
+        shutil.copy2(target, dest)
+        _purge_old(sec, today, days)
+    except OSError:
+        pass
+
+
 def backup_if_due(days: int = BACKUP_DAYS) -> str | None:
     """Sauvegarde quotidienne par utilisateur dans <dossier base>/backups (API de
-    sauvegarde SQLite = copie cohérente). Filet de sécurité contre une corruption ou
-    une copie en conflit de la synchronisation. Garde `days` jours."""
+    sauvegarde SQLite = copie cohérente), recopiée dans le dossier de secours
+    (`backup_dir_secours`) s'il est configuré. Filet de sécurité contre une corruption
+    ou une copie en conflit de la synchronisation. Garde `days` jours.
+    Retourne le chemin de la sauvegarde créée, ou None si elle existait déjà."""
     if not os.path.exists(DB_PATH):
         return None
     bdir = os.path.join(os.path.dirname(DB_PATH), "backups")
     user = "".join(c for c in os.environ.get("USERNAME", "user") if c.isalnum()) or "user"
     today = datetime.date.today()
     target = os.path.join(bdir, f"BEG_Data_{today:%Y%m%d}_{user}.db")
-    if os.path.exists(target):
-        return None
-    try:
-        os.makedirs(bdir, exist_ok=True)
-        src = sqlite3.connect(DB_PATH, timeout=10)
-        dst = sqlite3.connect(target)
+    created = None
+    if not os.path.exists(target):
         try:
-            src.backup(dst)
-        finally:
-            dst.close()
-            src.close()
-        limite = f"{today - datetime.timedelta(days=days):%Y%m%d}"
-        for f in glob.glob(os.path.join(bdir, "BEG_Data_*.db")):
-            stamp = os.path.basename(f)[len("BEG_Data_"):][:8]
-            if stamp.isdigit() and stamp < limite:
-                os.remove(f)
-        return target
-    except (OSError, sqlite3.Error):
-        return None
+            os.makedirs(bdir, exist_ok=True)
+            src = sqlite3.connect(DB_PATH, timeout=10)
+            dst = sqlite3.connect(target)
+            try:
+                src.backup(dst)
+            finally:
+                dst.close()
+                src.close()
+            _purge_old(bdir, today, days)
+            created = target
+        except (OSError, sqlite3.Error):
+            return None
+    _copy_secours(target, today, days)
+    return created
 
 
 def conflict_copies() -> list[str]:

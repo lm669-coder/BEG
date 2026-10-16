@@ -344,6 +344,7 @@ def _selftest(out_path: str) -> int:
             "import_data",
             "pdf_export",
             "duc_parser",
+            "chantier_dirs",
             "emasphere_client",
             "pypdf",
             "openpyxl",
@@ -381,11 +382,31 @@ def _selftest(out_path: str) -> int:
         out = tp.list_photos("T1")
         assert res.copied == 1 and res.reduced == 1, f"import/réduction: {res}"
         assert max(Image.open(out[0]).size) <= tp.MAX_SIDE, "image non réduite"
-        thumb = tp.thumb_path(tp.chantier_dir("T1"), out[0])
+        thumb = tp.thumb_path(out[0])
         assert os.path.isfile(thumb), "miniature absente (plugin JPEG Qt ?)"
         return f"{os.path.getsize(src) // 1024} Ko -> {os.path.getsize(out[0]) // 1024} Ko, miniature OK"
 
+    def _dossiers():
+        import tempfile
+
+        import chantier_dirs as cd
+
+        tmp = tempfile.mkdtemp(prefix="beg_selftest_dirs_")
+        os.makedirs(os.path.join(tmp, "1 chantier de test"))
+        cd.ROOTS, ancien = {"bat": [tmp], "elec": []}, cd.ROOTS
+        try:
+            cd.clear_cache()
+            r = cd.satisfaction_dirs("1", "Bat", create=True)
+            assert r and os.path.isdir(r[0]) and os.path.isdir(r[1]), "arborescence non créée"
+            assert os.path.basename(r[1]) == "Bilan d'expérience"
+            assert cd.satisfaction_dirs("999", "Bat") is None
+            return "résolution + création OK"
+        finally:
+            cd.ROOTS = ancien
+            cd.clear_cache()
+
     check("modules", _modules)
+    check("dossiers chantier", _dossiers)
     check("photos (réduction + miniature)", _photos)
     check("pdf+logo", _pdf)
     check("base", _db)

@@ -49,6 +49,10 @@ DATA_DIR = _cfg("data_dir", "BEG_DATA_DIR") or EXE_DIR
 DB_DIR_EXPLICIT = bool(_cfg("db_dir", "BEG_DB_DIR"))  # configurée => ne jamais créer une base vide
 DB_DIR = _cfg("db_dir", "BEG_DB_DIR") or DATA_DIR
 
+# Copie de secours quotidienne de la base (partage réseau, indépendant de OneDrive).
+# Vide = désactivée. Un partage injoignable n'empêche jamais l'application de démarrer.
+BACKUP_DIR_SECOURS = _cfg("backup_dir_secours", "BEG_BACKUP_DIR_SECOURS")
+
 CACHE_DIR = os.path.join(
     os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "BEG", "cache"
 )
