@@ -79,6 +79,21 @@ class TestResolve:
         assert cd.resolve("22026", "Bat").status == "ambigu"
         assert cd.resolve("22026-3", "Bat").status == "ambigu"
 
+    def test_numero_seul_prefere_le_dossier_principal_au_sous_chantier(self, tmp_path, monkeypatch):
+        # cas réel ELEC : « 21099 - Sambrienne… » et « 21099-1 - Sambrienne… »
+        root = _mk(tmp_path / "e", "21099 - Sambrienne multi-sites", "21099-1 - Sambrienne multi-sites")
+        monkeypatch.setattr(cd, "ROOTS", {"bat": [], "elec": [root]})
+        cd.clear_cache()
+        assert _name(cd.resolve("21099", "Elec")) == "21099 - Sambrienne multi-sites"
+        assert _name(cd.resolve("21099-1", "Elec")) == "21099-1 - Sambrienne multi-sites"
+
+    def test_deux_dossiers_au_meme_numero_restent_ambigus(self, tmp_path, monkeypatch):
+        # cas réel : « 25594 RCA Roeulx luminaires » et « 25594 Régie Du Roeulx Luminaires »
+        root = _mk(tmp_path / "e", "25594 RCA Roeulx luminaires", "25594 Regie Du Roeulx Luminaires")
+        monkeypatch.setattr(cd, "ROOTS", {"bat": [], "elec": [root]})
+        cd.clear_cache()
+        assert cd.resolve("25594", "Elec").status == "ambigu"
+
     def test_suffixe_inconnu_numero_de_base_unique(self, arbo):
         assert _name(cd.resolve("24087-1", "Bat")) == "24087 Enghien"
 

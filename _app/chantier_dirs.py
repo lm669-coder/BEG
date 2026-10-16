@@ -71,7 +71,10 @@ def _scan(root: str, id_c: str, base: str) -> tuple[list[str], list[str]]:
         names = sorted(os.listdir(root))
     except OSError:
         return [], []
-    exact = re.compile(rf"^{re.escape(id_c)}(?!\d)", re.IGNORECASE)
+    # Un numéro seul (« 21099 ») ne désigne pas le dossier d'un sous-chantier
+    # (« 21099-1 … ») : celui-ci n'est retenu que par l'ID complet ou, à défaut, le n° de base.
+    sans_suffixe = r"(?!-\d)" if id_c == base else ""
+    exact = re.compile(rf"^{re.escape(id_c)}(?!\d){sans_suffixe}", re.IGNORECASE)
     same_base = re.compile(rf"^{re.escape(base)}(?!\d)", re.IGNORECASE)
     ex, ba = [], []
     for n in names:
